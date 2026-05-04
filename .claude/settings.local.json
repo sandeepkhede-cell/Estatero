@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "PowerShell($basePath = \"c:\\\\Users\\\\sandeep\\\\Desktop\\\\Assestment\\\\real-estate\\\\real-estate-app\\\\src\"; $files = Get-ChildItem -Path $basePath -Recurse -File; $files | ForEach-Object { $_.FullName -replace [regex]::Escape\\($basePath + '\\\\'\\), '' })",
+      "Bash(docker exec *)"
+    ]
+  }
+}
