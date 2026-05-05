@@ -119,6 +119,12 @@ const HERO_PROPERTY_TYPE: Record<string, string> = {
   'Independent House': 'Independent House',
   'Plot/Land':         'Plot',
   'Villa':             'Villa',
+  'Builder Floor':     'Builder Floor',
+  'Office Space':      'Commercial',
+  'Shop/Showroom':     'Commercial',
+  'Warehouse':         'Commercial',
+  'Commercial Land':   'Commercial',
+  // PG/Co-living is handled by listingType=pg — no pt needed
 };
 
 // priceRange slider units (0-100) corresponding to budget labels

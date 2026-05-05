@@ -33,8 +33,15 @@ const Header = ({
   const { user, logout } = useAuth();
   const { open: openAuthModal } = useAuthModal();
 
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuOpen, setMenuOpen]       = useState(false);
+  const [navSearch, setNavSearch]     = useState('');
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const handleNavSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter' || !navSearch.trim()) return;
+    navigate(`/listings?city=${encodeURIComponent(navSearch.trim())}`);
+    setNavSearch('');
+  };
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -109,7 +116,10 @@ const Header = ({
               <span className="material-symbols-outlined text-outline text-xl">search</span>
               <input
                 type="text"
-                placeholder="Search..."
+                value={navSearch}
+                onChange={(e) => setNavSearch(e.target.value)}
+                onKeyDown={handleNavSearch}
+                placeholder="Search city..."
                 className="bg-transparent border-none focus:ring-0 text-body-sm w-32 outline-none"
               />
             </div>
