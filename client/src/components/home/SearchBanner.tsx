@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import SearchField from '../ui/SearchField';
+import SearchSelect from '../ui/SearchSelect';
 import SuggestionsDropdown from '../ui/SuggestionsDropdown';
 import { useSearchSuggestions } from '../../hooks/useSearchSuggestions';
 import { usePopularSearches } from '../../hooks/usePopularSearches';
@@ -36,10 +37,15 @@ const SearchBanner = ({
   budgetOptions = defaultBudgetOptions,
   onSearch,
 }: SearchBannerProps) => {
-  const [city, setCity]               = useState('');
+  const [city, setCity]                 = useState('');
   const [propertyType, setPropertyType] = useState(propertyTypes[0]);
-  const [budget, setBudget]           = useState(budgetOptions[0]);
-  const [focused, setFocused]         = useState(false);
+  const [budget, setBudget]             = useState(budgetOptions[0]);
+  const [focused, setFocused]           = useState(false);
+
+  // Reset property type when the tab changes (propertyTypes prop changes)
+  useEffect(() => {
+    setPropertyType(propertyTypes[0]);
+  }, [propertyTypes]);
 
   const { suggestions, loading } = useSearchSuggestions(city);
   const { popular }              = usePopularSearches();
@@ -87,30 +93,22 @@ const SearchBanner = ({
         </div>
 
         {/* Property Type */}
-        <SearchField icon="home_work" label="Property Type">
-          <select
-            value={propertyType}
-            onChange={(e) => setPropertyType(e.target.value)}
-            className="w-full bg-transparent border-none p-0 focus:ring-0 font-label-bold text-on-surface appearance-none outline-none"
-          >
-            {propertyTypes.map((type) => (
-              <option key={type}>{type}</option>
-            ))}
-          </select>
-        </SearchField>
+        <SearchSelect
+          icon="home_work"
+          label="Property Type"
+          value={propertyType}
+          options={propertyTypes}
+          onChange={setPropertyType}
+        />
 
         {/* Budget */}
-        <SearchField icon="payments" label="Budget">
-          <select
-            value={budget}
-            onChange={(e) => setBudget(e.target.value)}
-            className="w-full bg-transparent border-none p-0 focus:ring-0 font-label-bold text-on-surface appearance-none outline-none"
-          >
-            {budgetOptions.map((option) => (
-              <option key={option}>{option}</option>
-            ))}
-          </select>
-        </SearchField>
+        <SearchSelect
+          icon="payments"
+          label="Budget"
+          value={budget}
+          options={budgetOptions}
+          onChange={setBudget}
+        />
 
         <button
           onClick={handleSearch}

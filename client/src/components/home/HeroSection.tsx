@@ -68,9 +68,9 @@ const HeroSection = ({
         </h1>
 
         {/* Search card with tabs */}
-        <div className="bg-white rounded-xl shadow-2xl max-w-5xl mx-auto overflow-hidden">
-          {/* Tab row */}
-          <div className="flex border-b border-outline-variant">
+        <div className="bg-white rounded-xl shadow-2xl max-w-5xl mx-auto">
+          {/* Tab row — overflow-hidden here only, so the suggestions dropdown below is not clipped */}
+          <div className="flex border-b border-outline-variant rounded-t-xl overflow-hidden">
             {TABS.map(({ key, label }) => (
               <button
                 key={key}
@@ -87,8 +87,8 @@ const HeroSection = ({
             ))}
           </div>
 
-          {/* Search fields */}
-          <div className="p-sm md:p-md">
+          {/* Search fields — no overflow-hidden here so suggestions dropdown renders outside the card */}
+          <div className="p-sm md:p-md rounded-b-xl overflow-visible">
             <SearchBanner
               propertyTypes={TAB_PROPERTY_TYPES[activeTab]}
               budgetOptions={budgetOptions}
