@@ -21,6 +21,7 @@ Use these skills to drive development:
 | `/api-design` | Design REST endpoints and Express controllers |
 | `/integration` | Wire frontend to backend APIs |
 | `/qa-debug` | Fix bugs and UI issues |
+| `/pr-review` | Review code changes for bugs, security, performance, and conventions |
 
 ## Development Workflow
 

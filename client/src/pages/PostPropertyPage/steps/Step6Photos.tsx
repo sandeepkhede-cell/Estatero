@@ -6,9 +6,28 @@ interface Props {
   onChange: (patch: Partial<PostPropertyForm>) => void;
 }
 
+const API_BASE = (import.meta as unknown as { env: Record<string, string> }).env.VITE_API_URL
+  ?? 'http://localhost:5000/api';
+
+async function uploadFiles(files: File[]): Promise<string[]> {
+  const formData = new FormData();
+  files.forEach((f) => formData.append('images', f));
+  const token = localStorage.getItem('token');
+  const res = await fetch(`${API_BASE}/upload`, {
+    method: 'POST',
+    body: formData,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error('Upload failed');
+  const data = await res.json() as { urls: string[] };
+  return data.urls;
+}
+
 const Step6Photos = ({ form, onChange }: Props) => {
   const [urlInput, setUrlInput]   = useState('');
   const [dragOver, setDragOver]   = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadErr, setUploadErr] = useState('');
   const fileRef                   = useRef<HTMLInputElement>(null);
 
   const addUrls = (urls: string[]) => {
@@ -18,13 +37,23 @@ const Step6Photos = ({ form, onChange }: Props) => {
     onChange({ imageUrls: next });
   };
 
-  const handleFiles = (files: FileList | null) => {
-    if (!files) return;
-    // Create object URLs for local preview — these are transient
-    const urls = Array.from(files)
-      .filter((f) => f.type.startsWith('image/'))
-      .map((f) => URL.createObjectURL(f));
-    addUrls(urls);
+  const handleFiles = async (files: FileList | null) => {
+    if (!files?.length) return;
+    const imageFiles = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    if (!imageFiles.length) return;
+
+    setUploading(true);
+    setUploadErr('');
+    try {
+      const urls = await uploadFiles(imageFiles);
+      const next = [...new Set([...form.imageUrls, ...urls])].slice(0, 15);
+      onChange({ imageUrls: next });
+    } catch {
+      setUploadErr('Upload failed. Please try again.');
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
   };
 
   const remove = (url: string) =>
@@ -42,23 +71,35 @@ const Step6Photos = ({ form, onChange }: Props) => {
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
-        onClick={() => fileRef.current?.click()}
+        onClick={() => !uploading && fileRef.current?.click()}
         className={[
-          'border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-colors',
+          'border-2 border-dashed rounded-2xl p-10 text-center transition-colors',
+          uploading ? 'cursor-wait opacity-60' : 'cursor-pointer',
           dragOver
             ? 'border-primary bg-primary-fixed'
             : 'border-outline-variant hover:border-primary hover:bg-surface-container-low',
         ].join(' ')}
       >
-        <span className="material-symbols-outlined text-4xl text-outline mb-3 block">
-          cloud_upload
-        </span>
-        <p className="text-sm font-semibold text-on-surface">
-          Drag & drop photos here, or click to browse
-        </p>
-        <p className="text-xs text-on-surface-variant mt-1">
-          Up to 15 photos · JPG, PNG, WEBP
-        </p>
+        {uploading ? (
+          <>
+            <span className="material-symbols-outlined text-4xl text-primary mb-3 block animate-spin">
+              progress_activity
+            </span>
+            <p className="text-sm font-semibold text-on-surface">Uploading photos…</p>
+          </>
+        ) : (
+          <>
+            <span className="material-symbols-outlined text-4xl text-outline mb-3 block">
+              cloud_upload
+            </span>
+            <p className="text-sm font-semibold text-on-surface">
+              Drag & drop photos here, or click to browse
+            </p>
+            <p className="text-xs text-on-surface-variant mt-1">
+              Up to 15 photos · JPG, PNG, WEBP · Max 10 MB each
+            </p>
+          </>
+        )}
         <input
           ref={fileRef}
           type="file"
@@ -68,6 +109,13 @@ const Step6Photos = ({ form, onChange }: Props) => {
           onChange={(e) => handleFiles(e.target.files)}
         />
       </div>
+
+      {uploadErr && (
+        <p className="text-sm text-red-600 flex items-center gap-1.5">
+          <span className="material-symbols-outlined text-[16px]">error</span>
+          {uploadErr}
+        </p>
+      )}
 
       {/* URL input fallback */}
       <div className="flex gap-2">
@@ -102,7 +150,6 @@ const Step6Photos = ({ form, onChange }: Props) => {
                   src={url}
                   alt={`Photo ${i + 1}`}
                   className="w-full h-full object-cover"
-                  onError={(e) => { (e.target as HTMLImageElement).src = ''; }}
                 />
                 {i === 0 && (
                   <span className="absolute bottom-1 left-1 bg-primary text-white text-[9px] font-bold px-1.5 py-0.5 rounded">

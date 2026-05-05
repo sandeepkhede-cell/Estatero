@@ -3,12 +3,14 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import dotenv from 'dotenv';
+import path from 'path';
 
 import propertyRoutes from './routes/properties';
 import searchRoutes   from './routes/search';
 import agentRoutes    from './routes/agents';
 import authRoutes     from './routes/auth';
 import userRoutes     from './routes/users';
+import uploadRoutes   from './routes/upload';
 import { notFound, errorHandler } from './middleware/errorHandler';
 
 dotenv.config();
@@ -25,7 +27,14 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// ── Static uploads (cross-origin so <img> tags load from frontend port) ───────
+app.use('/uploads',
+  (_req, res, next) => { res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin'); next(); },
+  express.static(path.join(process.cwd(), 'uploads')),
+);
+
 // ── Routes ────────────────────────────────────────────────────────────────────
+app.use('/api/upload',     uploadRoutes);
 app.use('/api/auth',       authRoutes);
 app.use('/api/properties', propertyRoutes);
 app.use('/api/search',     searchRoutes);

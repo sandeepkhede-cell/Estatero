@@ -29,14 +29,17 @@ export interface NearbyPlace {
 }
 
 export interface Agent {
-  id:            string | number;
-  name:          string;
-  role:          'owner' | 'agent' | 'builder';
-  tagline?:      string;
-  avatar:        string;
-  phone?:        string;
-  email?:        string;
+  id:             string | number;
+  name:           string;
+  role:           'owner' | 'agent' | 'builder' | string;
+  tagline?:       string;
+  avatar:         string;
+  phone?:         string;
+  email?:         string;
   totalListings?: number;
+  bio?:           string;
+  rating?:        number;
+  listingsCount?: number;
 }
 
 // ── Core entity ────────────────────────────────────────────────────────────────

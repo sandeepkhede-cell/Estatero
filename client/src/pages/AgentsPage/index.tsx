@@ -48,26 +48,24 @@ const AgentCard = ({ agent }: { agent: Agent }) => {
             {agent.name}
           </button>
           <p className="text-xs text-on-surface-variant mt-0.5 truncate">{agent.role}</p>
-          {(agent as Agent & { rating?: number }).rating !== undefined && (
+          {agent.rating !== undefined && (
             <div className="mt-1">
-              <StarRating rating={(agent as Agent & { rating?: number }).rating!} />
+              <StarRating rating={agent.rating} />
             </div>
           )}
         </div>
-        {(agent as Agent & { listingsCount?: number }).listingsCount !== undefined && (
+        {agent.listingsCount !== undefined && (
           <div className="text-center flex-shrink-0">
-            <p className="text-lg font-bold text-primary">
-              {(agent as Agent & { listingsCount?: number }).listingsCount}
-            </p>
+            <p className="text-lg font-bold text-primary">{agent.listingsCount}</p>
             <p className="text-[10px] text-on-surface-variant uppercase tracking-wide">Listings</p>
           </div>
         )}
       </div>
 
       {/* Bio */}
-      {(agent as Agent & { bio?: string }).bio && (
+      {agent.bio && (
         <p className="text-xs text-on-surface-variant leading-relaxed line-clamp-2">
-          {(agent as Agent & { bio?: string }).bio}
+          {agent.bio}
         </p>
       )}
 

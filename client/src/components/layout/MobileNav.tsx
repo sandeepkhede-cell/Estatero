@@ -12,10 +12,11 @@ interface MobileNavProps {
 }
 
 const defaultTabs: NavTab[] = [
-  { label: 'Home',     icon: 'home',       path: '/' },
-  { label: 'Saved',    icon: 'favorite',   path: '/saved' },
-  { label: 'Post',     icon: 'add_circle' },
-  { label: 'Profile',  icon: 'person' },
+  { label: 'Home',    icon: 'home',         path: '/' },
+  { label: 'Saved',   icon: 'favorite',     path: '/saved' },
+  { label: 'Post',    icon: 'add_circle' },
+  { label: 'Agents',  icon: 'contact_page', path: '/agents' },
+  { label: 'Profile', icon: 'person',       path: '/profile' },
 ];
 
 const MobileNav = ({ tabs = defaultTabs }: MobileNavProps) => {
