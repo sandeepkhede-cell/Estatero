@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useFavourites } from '../../hooks/useFavourites';
 import { formatINR } from '../../utils/formatINR';
 import ImageGallery from '../../components/detail/ImageGallery';
 import PropertyInfoRow from '../../components/detail/PropertyInfoRow';
@@ -25,7 +26,7 @@ const DetailPage = () => {
   const navigate               = useNavigate();
   const { id }                 = useParams();
   const { property, loading }  = usePropertyDetail(id);
-  const [favd, setFavd]        = useState(false);
+  const { toggle, isFavourited } = useFavourites();
   const [modal, setModal]      = useState<ModalMode | null>(null);
 
   const { properties: similar } = useSimilarProperties(property?.city, property?.id);
@@ -63,12 +64,12 @@ const DetailPage = () => {
 
           <div className="flex items-center gap-4 flex-shrink-0">
             <button
-              onClick={() => setFavd((p) => !p)}
+              onClick={() => toggle(property.id)}
               className="flex items-center gap-1.5 text-on-surface-variant hover:text-primary transition-colors"
             >
               <span
                 className="material-symbols-outlined text-[22px]"
-                style={favd ? { fontVariationSettings: "'FILL' 1", color: '#a700ad' } : {}}
+                style={isFavourited(property.id) ? { fontVariationSettings: "'FILL' 1", color: '#a700ad' } : {}}
               >
                 favorite
               </span>

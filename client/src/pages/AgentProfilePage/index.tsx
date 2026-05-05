@@ -113,7 +113,7 @@ const AgentProfilePage = () => {
                 )
               )}
               <button
-                onClick={() => navigate(`/listings?agentId=${id}`)}
+                onClick={() => document.getElementById('agent-listings')?.scrollIntoView({ behavior: 'smooth' })}
                 className="flex items-center gap-2 border-2 border-primary text-primary px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-fixed transition-colors"
               >
                 <span className="material-symbols-outlined text-[18px]">search</span>
@@ -124,7 +124,7 @@ const AgentProfilePage = () => {
         </div>
 
         {/* Listings grid */}
-        <h2 className="text-lg font-bold text-on-surface mb-4">
+        <h2 id="agent-listings" className="text-lg font-bold text-on-surface mb-4">
           Properties by {agent.name}
         </h2>
 
