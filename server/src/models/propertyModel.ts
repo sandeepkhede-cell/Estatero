@@ -336,3 +336,14 @@ export async function findPropertiesByAgentUserId(userId: number): Promise<Prope
   );
   return rows.map(toDTO);
 }
+
+export async function findPropertiesByAgentId(agentId: number): Promise<PropertyDTO[]> {
+  const { rows } = await pool.query<PropertyRow>(
+    `${BASE_SELECT}
+     WHERE p.agent_id = $1
+     GROUP BY p.id, u.name, u.phone, ag.bio, ag.profile_image
+     ORDER BY p.created_at DESC`,
+    [agentId],
+  );
+  return rows.map(toDTO);
+}

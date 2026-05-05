@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { agentService } from '../../services/agentService';
-import { userService } from '../../services/userService';
 import { Agent, Property } from '../../types/property';
 import PropertyCard from '../../components/ui/PropertyCard';
 import { useFavourites } from '../../hooks/useFavourites';
@@ -26,7 +25,7 @@ const AgentProfilePage = () => {
       .then(setAgent)
       .finally(() => setLoadingA(false));
 
-    userService.getProperties(numId)
+    agentService.getProperties(numId)
       .then(setListings)
       .finally(() => setLoadingL(false));
   }, [id]);

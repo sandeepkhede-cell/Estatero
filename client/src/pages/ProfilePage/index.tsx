@@ -17,7 +17,7 @@ const ProfilePage = () => {
   const { user, logout }   = useAuth();
   const { open }           = useAuthModal();
   const { toggle }         = useFavourites();
-  const { properties: savedProperties, loading: loadingS } = useSavedProperties();
+  const { properties: savedProperties, loading: loadingS, toggle: savedToggle } = useSavedProperties();
 
   const [tab,        setTab]        = useState<Tab>('listings');
   const [profile,    setProfile]    = useState<UserProfile | null>(null);
@@ -185,7 +185,7 @@ const ProfilePage = () => {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {savedProperties.map((p) => (
-              <PropertyCard key={p.id} property={p} onCardClick={(id) => navigate(`/property/${id}`)} onFavourite={toggle} />
+              <PropertyCard key={p.id} property={p} onCardClick={(id) => navigate(`/property/${id}`)} onFavourite={savedToggle} />
             ))}
           </div>
         )}

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as agentModel from '../models/agentModel';
+import { findPropertiesByAgentId } from '../models/propertyModel';
 
 export async function getAllAgents(req: Request, res: Response, next: NextFunction) {
   try {
@@ -24,6 +25,17 @@ export async function getAgentById(req: Request, res: Response, next: NextFuncti
       return;
     }
     res.json(agent);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getAgentProperties(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid agent ID' }); return; }
+    const properties = await findPropertiesByAgentId(id);
+    res.json(properties);
   } catch (err) {
     next(err);
   }

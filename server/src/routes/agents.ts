@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getAllAgents, getAgentById, contactAgent } from '../controllers/agentController';
+import { getAllAgents, getAgentById, getAgentProperties, contactAgent } from '../controllers/agentController';
 
 const router = Router();
 
@@ -9,7 +9,10 @@ router.get('/', getAllAgents);
 // GET  /api/agents/:id
 router.get('/:id', getAgentById);
 
-// POST /api/agents/:id/contact  { message: string, email?: string }
+// GET  /api/agents/:id/properties
+router.get('/:id/properties', getAgentProperties);
+
+// POST /api/agents/:id/contact
 router.post('/:id/contact', contactAgent);
 
 export default router;

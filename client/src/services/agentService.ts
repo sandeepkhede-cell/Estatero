@@ -1,5 +1,5 @@
 import { api } from './api';
-import { Agent } from '../types/property';
+import { Agent, Property } from '../types/property';
 
 export interface ContactPayload {
   message:     string;
@@ -19,6 +19,9 @@ export const agentService = {
 
   getById: (id: string | number) =>
     api.get<Agent>(`/agents/${id}`),
+
+  getProperties: (agentId: string | number) =>
+    api.get<Property[]>(`/agents/${agentId}/properties`),
 
   contact: (agentId: string | number, payload: ContactPayload) =>
     api.post<{ success: boolean }>(`/agents/${agentId}/contact`, payload),
