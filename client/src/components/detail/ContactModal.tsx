@@ -1,5 +1,6 @@
 import { useState, FormEvent, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useAuthModal } from '../../context/AuthModalContext';
 import { agentService } from '../../services/agentService';
 import type { Agent } from '../../types/property';
 
@@ -13,6 +14,8 @@ interface ContactModalProps {
 
 const ContactModal = ({ agent, propertyId, propertyTitle, mode, onClose }: ContactModalProps) => {
   const { user } = useAuth();
+  const { open: openAuthModal } = useAuthModal();
+  const [phoneRevealed, setPhoneRevealed] = useState(!!user);
 
   const [name,    setName]    = useState(user?.name  ?? '');
   const [email,   setEmail]   = useState(user?.email ?? '');
@@ -83,7 +86,7 @@ const ContactModal = ({ agent, propertyId, propertyTitle, mode, onClose }: Conta
             </div>
             <button
               onClick={onClose}
-              className="mt-2 bg-blue-600 text-white font-semibold px-8 py-2.5 rounded-lg hover:bg-blue-700 transition-colors"
+              className="mt-2 bg-primary text-white font-semibold px-8 py-2.5 rounded-lg hover:bg-[#b71c24] transition-colors"
             >
               Done
             </button>
@@ -91,7 +94,7 @@ const ContactModal = ({ agent, propertyId, propertyTitle, mode, onClose }: Conta
         ) : (
           <>
             {/* Agent info strip */}
-            <div className="px-6 py-3 bg-blue-50 flex items-center gap-3 border-b border-blue-100">
+            <div className="px-6 py-3 bg-red-50 flex items-center gap-3 border-b border-red-100">
               <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
                 {agent.avatar
                   ? <img src={agent.avatar} alt={agent.name} className="w-full h-full object-cover" />
@@ -103,13 +106,24 @@ const ContactModal = ({ agent, propertyId, propertyTitle, mode, onClose }: Conta
                 <p className="text-xs text-gray-500 truncate">{agent.role}</p>
               </div>
               {agent.phone && (
-                <a
-                  href={`tel:${agent.phone}`}
-                  className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700"
-                >
-                  <span className="material-symbols-outlined text-[16px]">call</span>
-                  Call
-                </a>
+                phoneRevealed ? (
+                  <a
+                    href={`tel:${agent.phone}`}
+                    className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-[#b71c24]"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">call</span>
+                    {agent.phone}
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => user ? setPhoneRevealed(true) : openAuthModal('login')}
+                    className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-[#b71c24]"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">call</span>
+                    View Number
+                  </button>
+                )
               )}
             </div>
 
@@ -125,7 +139,7 @@ const ContactModal = ({ agent, propertyId, propertyTitle, mode, onClose }: Conta
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Your name"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
                 <div>
@@ -137,7 +151,7 @@ const ContactModal = ({ agent, propertyId, propertyTitle, mode, onClose }: Conta
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="+91 XXXXX XXXXX"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
               </div>
@@ -151,7 +165,7 @@ const ContactModal = ({ agent, propertyId, propertyTitle, mode, onClose }: Conta
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
 
@@ -164,7 +178,7 @@ const ContactModal = ({ agent, propertyId, propertyTitle, mode, onClose }: Conta
                   onChange={(e) => setMessage(e.target.value)}
                   rows={3}
                   required
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
 
@@ -178,7 +192,7 @@ const ContactModal = ({ agent, propertyId, propertyTitle, mode, onClose }: Conta
               <button
                 type="submit"
                 disabled={busy}
-                className="w-full h-12 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold flex items-center justify-center gap-2 transition-colors"
+                className="w-full h-12 rounded-xl bg-primary hover:bg-[#b71c24] disabled:opacity-60 text-white font-semibold flex items-center justify-center gap-2 transition-colors"
               >
                 {busy && (
                   <span className="material-symbols-outlined animate-spin text-[18px]">

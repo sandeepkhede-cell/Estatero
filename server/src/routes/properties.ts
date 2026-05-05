@@ -4,20 +4,21 @@ import {
   getPropertyById,
   getFeaturedProperties,
   searchProperties,
+  createProperty,
+  updateProperty,
+  deleteProperty,
 } from '../controllers/propertyController';
+import { requireAuth } from '../middleware/auth';
 
 const router = Router();
 
-// GET /api/properties/featured   — must be declared before /:id
 router.get('/featured', getFeaturedProperties);
-
-// GET /api/properties/search?q=...
 router.get('/search', searchProperties);
+router.get('/',      getProperties);
+router.get('/:id',   getPropertyById);
 
-// GET /api/properties?page=1&city=Mumbai&propertyType=apartment&bhk=2&priceRange=5000000&sortBy=newest
-router.get('/', getProperties);
-
-// GET /api/properties/:id
-router.get('/:id', getPropertyById);
+router.post('/',     requireAuth, createProperty);
+router.put('/:id',   requireAuth, updateProperty);
+router.delete('/:id', requireAuth, deleteProperty);
 
 export default router;

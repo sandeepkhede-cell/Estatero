@@ -1,5 +1,14 @@
+// ── Domain literals ────────────────────────────────────────────────────────────
+
+export type ListingType     = 'sale' | 'rent' | 'pg';
+export type PropertyType    = 'apartment' | 'villa' | 'builder-floor' | 'plot' | 'commercial' | 'penthouse';
+export type FurnishingType  = 'unfurnished' | 'semi-furnished' | 'fully-furnished';
+export type AvailabilityType = 'ready-to-move' | 'under-construction';
+
+// ── Sub-shapes ─────────────────────────────────────────────────────────────────
+
 export interface PropertyMetaItem {
-  icon: string;
+  icon:  string;
   value: string;
 }
 
@@ -9,45 +18,88 @@ export interface PropertySpec {
 }
 
 export interface Amenity {
-  icon: string;
+  icon:  string;
   label: string;
 }
 
 export interface NearbyPlace {
-  icon: string;
-  name: string;
+  icon:     string;
+  name:     string;
   distance: string;
 }
 
 export interface Agent {
-  id: string | number;
-  name: string;
-  role: string;
-  avatar: string;
-  phone?: string;
+  id:            string | number;
+  name:          string;
+  role:          'owner' | 'agent' | 'builder';
+  tagline?:      string;
+  avatar:        string;
+  phone?:        string;
+  email?:        string;
+  totalListings?: number;
 }
 
+// ── Core entity ────────────────────────────────────────────────────────────────
+
 export interface Property {
-  id: string | number;
-  price: string;
-  title: string;
-  description: string;
-  location: string;
-  image: string;
-  images?: string[];
-  badge?: string;
-  badgeVariant?: 'primary' | 'secondary';
-  isVerified?: boolean;
-  isFavourited?: boolean;
-  meta: PropertyMetaItem[];
-  // enriched fields (prototype 1)
-  emi?: string;
-  area?: string;
-  status?: string;
-  floor?: string;
-  pricePerSqft?: string;
-  facing?: string;
-  amenities?: Amenity[];
-  nearbyPlaces?: NearbyPlace[];
-  agent?: Agent;
+  id:              string | number;
+
+  // Pricing — always a raw number; use formatINR() to display
+  price:           number;
+  pricePerSqft?:   string;   // pre-formatted display string from backend
+  emi?:            string;   // pre-formatted display string from backend
+
+  // Listing classification
+  listingType?:    ListingType;
+  propertyType?:   PropertyType;
+
+  // Core details
+  title:           string;
+  description:     string;
+  location:        string;
+  city?:           string;
+  locality?:       string;
+
+  // Media
+  image:           string;
+  images?:         string[];
+
+  // Specs
+  bedrooms?:       number;
+  bathrooms?:      number;
+  areaSqft?:       number;
+  area?:           string;   // legacy formatted string ("1,850 sqft")
+  floor?:          string;
+  facing?:         string;
+  ageOfProperty?:  string;
+
+  // Status / flags
+  status?:         string;
+  furnishing?:     FurnishingType;
+  availability?:   AvailabilityType;
+  isVerified?:     boolean;
+  isFavourited?:   boolean;
+  isFeatured?:     boolean;
+  isReraRegistered?: boolean;
+  reraNumber?:     string;
+
+  // Display extras
+  badge?:          string;
+  badgeVariant?:   'primary' | 'secondary';
+  meta:            PropertyMetaItem[];
+
+  // Relations
+  amenities?:      Amenity[];
+  nearbyPlaces?:   NearbyPlace[];
+  agent?:          Agent;
+}
+
+// ── List / pagination ──────────────────────────────────────────────────────────
+
+export interface PaginatedProperties {
+  properties:  Property[];
+  total:       number;
+  page:        number;
+  totalPages:  number;
+  limit:       number;
 }

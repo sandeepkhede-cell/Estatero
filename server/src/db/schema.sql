@@ -57,15 +57,29 @@ CREATE TABLE IF NOT EXISTS properties (
 
   -- Classification
   property_type  VARCHAR(50)   NOT NULL
-                               CHECK (property_type IN ('apartment','villa','plot','commercial')),
+                               CHECK (property_type IN (
+                                 'apartment','villa','plot','commercial',
+                                 'penthouse','builder_floor'
+                               )),
   status         VARCHAR(20)   NOT NULL DEFAULT 'for_sale'
-                               CHECK (status IN ('for_sale','for_rent')),
+                               CHECK (status IN ('for_sale','for_rent','pg')),
   bedrooms       SMALLINT,
   bathrooms      SMALLINT,
   area_sqft      INTEGER,
   floor          SMALLINT,
   total_floors   SMALLINT,
   facing         VARCHAR(30),  -- 'East', 'North-East', etc.
+
+  -- Property details
+  furnishing     VARCHAR(30)   CHECK (furnishing IN (
+                                 'unfurnished','semi-furnished','fully-furnished'
+                               )),
+  availability   VARCHAR(30)   CHECK (availability IN (
+                                 'ready-to-move','under-construction'
+                               )),
+  age_of_property VARCHAR(50),             -- '0-1 year','1-5 years','5-10 years','10+ years'
+  rera_registered BOOLEAN      NOT NULL DEFAULT FALSE,
+  rera_number    TEXT,
 
   -- Display
   badge          VARCHAR(100),
@@ -150,8 +164,11 @@ CREATE INDEX IF NOT EXISTS idx_properties_price       ON properties(price);
 CREATE INDEX IF NOT EXISTS idx_properties_bedrooms    ON properties(bedrooms);
 CREATE INDEX IF NOT EXISTS idx_properties_featured    ON properties(is_featured) WHERE is_featured = TRUE;
 CREATE INDEX IF NOT EXISTS idx_properties_created     ON properties(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_properties_agent       ON properties(agent_id);
-CREATE INDEX IF NOT EXISTS idx_property_images_prop   ON property_images(property_id);
+CREATE INDEX IF NOT EXISTS idx_properties_agent        ON properties(agent_id);
+CREATE INDEX IF NOT EXISTS idx_properties_furnishing  ON properties(furnishing);
+CREATE INDEX IF NOT EXISTS idx_properties_availability ON properties(availability);
+CREATE INDEX IF NOT EXISTS idx_properties_rera         ON properties(rera_registered) WHERE rera_registered = TRUE;
+CREATE INDEX IF NOT EXISTS idx_property_images_prop    ON property_images(property_id);
 CREATE INDEX IF NOT EXISTS idx_nearby_places_prop     ON nearby_places(property_id);
 CREATE INDEX IF NOT EXISTS idx_favourites_user        ON favourites(user_id);
 

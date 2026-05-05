@@ -1,7 +1,10 @@
 import { Router } from 'express';
-import { getAgentById, contactAgent } from '../controllers/agentController';
+import { getAllAgents, getAgentById, contactAgent } from '../controllers/agentController';
 
 const router = Router();
+
+// GET  /api/agents
+router.get('/', getAllAgents);
 
 // GET  /api/agents/:id
 router.get('/:id', getAgentById);

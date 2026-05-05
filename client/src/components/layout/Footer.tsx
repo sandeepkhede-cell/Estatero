@@ -51,7 +51,7 @@ const Footer = ({
           <a
             key={link.label}
             href={link.href ?? '#'}
-            className="text-gray-500 hover:text-blue-600 hover:underline transition-all duration-200"
+            className="text-gray-500 hover:text-primary hover:underline transition-all duration-200"
           >
             {link.label}
           </a>

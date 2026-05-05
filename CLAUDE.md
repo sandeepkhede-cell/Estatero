@@ -15,6 +15,8 @@ Use these skills to drive development:
 | Skill | Purpose |
 |---|---|
 | `/react-refactor` | Convert CDN/monolithic React to Vite+TS components |
+| `/react-ui` | Create React components (atomic, domain, layout, forms) |
+| `/99acres-clone` | Replicate 99acres.com pages, components, and UX patterns |
 | `/architecture` | Design folder structure and data flow |
 | `/api-design` | Design REST endpoints and Express controllers |
 | `/integration` | Wire frontend to backend APIs |

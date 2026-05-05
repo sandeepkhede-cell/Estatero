@@ -1,6 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
 import * as agentModel from '../models/agentModel';
 
+export async function getAllAgents(req: Request, res: Response, next: NextFunction) {
+  try {
+    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+    const agents = await agentModel.findAllAgents(search);
+    res.json({ agents, total: agents.length });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function getAgentById(req: Request, res: Response, next: NextFunction) {
   try {
     const id = parseInt(req.params.id, 10);

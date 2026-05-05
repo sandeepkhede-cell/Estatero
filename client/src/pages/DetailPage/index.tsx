@@ -1,15 +1,20 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { formatINR } from '../../utils/formatINR';
 import ImageGallery from '../../components/detail/ImageGallery';
 import PropertyInfoRow from '../../components/detail/PropertyInfoRow';
 import PropertyStatGrid from '../../components/detail/PropertyStatGrid';
+import KeyDetailsSection from '../../components/detail/KeyDetailsSection';
 import AboutSection from '../../components/detail/AboutSection';
 import AmenitiesSection from '../../components/detail/AmenitiesSection';
 import LocationSection from '../../components/detail/LocationSection';
 import AgentCard from '../../components/detail/AgentCard';
 import BottomActionBar from '../../components/detail/BottomActionBar';
 import ContactModal from '../../components/detail/ContactModal';
+import Breadcrumb from '../../components/ui/Breadcrumb';
+import RecommendedSection from '../../components/home/RecommendedSection';
 import { usePropertyDetail } from '../../hooks/usePropertyDetail';
+import { useSimilarProperties } from '../../hooks/useSimilarProperties';
 
 const MAP_IMAGE =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuDz2vDacJKsq6UUycICrPPvIFVxX4xk6z-_XgOX7isJosxpbfVTpbGsnnRyvDqZU-Bf9cksD7buYC_RDY0u5-BhruKKy4RKJ_04VL6EXpJhO_-k2Dow00Ov5_AcARLGn_l1Lc4WS1EgkJq9PpzoPGYfOpuaSruuYozuQvY3I_wmUjWLeErLe5QSAlkxo4nY-iKeGQd6X8XwoWhZNZ1oYHwMFnfqoVpyAHUBOo9R90DAIAW3aiBpKSAs3hud9OnzmJLSidbKqZ0PttY';
@@ -22,6 +27,8 @@ const DetailPage = () => {
   const { property, loading }  = usePropertyDetail(id);
   const [favd, setFavd]        = useState(false);
   const [modal, setModal]      = useState<ModalMode | null>(null);
+
+  const { properties: similar } = useSimilarProperties(property?.city, property?.id);
 
   if (loading || !property) {
     return (
@@ -37,6 +44,13 @@ const DetailPage = () => {
     { icon: 'explore',    value: property.facing ?? '—',         label: 'Facing' },
   ];
 
+  const breadcrumbs = [
+    { label: 'Home',              href: '/' },
+    property.city     && { label: property.city,     href: `/listings?city=${encodeURIComponent(property.city)}` },
+    property.location && { label: property.location, href: `/listings?city=${encodeURIComponent(property.city ?? '')}` },
+    { label: property.title },
+  ].filter(Boolean) as { label: string; href?: string }[];
+
   const handleCall = () => window.open(`tel:${property.agent?.phone ?? ''}`);
 
   return (
@@ -44,16 +58,10 @@ const DetailPage = () => {
 
       {/* ── Breadcrumb bar ── */}
       <div className="border-b border-outline-variant bg-white">
-        <div className="max-w-[1200px] mx-auto px-6 py-3 flex items-center justify-between">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-1.5 text-on-surface-variant hover:text-primary transition-colors"
-          >
-            <span className="material-symbols-outlined text-[20px]">arrow_back</span>
-            <span className="text-body-sm font-semibold hidden sm:inline">Back to Listings</span>
-          </button>
+        <div className="max-w-[1200px] mx-auto px-6 py-3 flex items-center justify-between gap-4">
+          <Breadcrumb items={breadcrumbs} />
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-shrink-0">
             <button
               onClick={() => setFavd((p) => !p)}
               className="flex items-center gap-1.5 text-on-surface-variant hover:text-primary transition-colors"
@@ -99,6 +107,8 @@ const DetailPage = () => {
 
             <PropertyStatGrid stats={stats} />
 
+            <KeyDetailsSection property={property} />
+
             {property.description && (
               <AboutSection description={property.description} />
             )}
@@ -123,7 +133,7 @@ const DetailPage = () => {
             <div className="sticky top-[88px] space-y-4">
 
               <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-                <p className="text-[28px] font-bold text-primary leading-tight">{property.price}</p>
+                <p className="text-[28px] font-bold text-primary leading-tight">{formatINR(property.price)}</p>
                 {property.pricePerSqft && (
                   <p className="text-body-sm text-on-surface-variant mt-0.5">{property.pricePerSqft}</p>
                 )}
@@ -169,6 +179,15 @@ const DetailPage = () => {
 
         </div>
       </div>
+
+      {/* Similar properties */}
+      {similar.length > 0 && (
+        <RecommendedSection
+          title="Similar Properties"
+          properties={similar}
+          onCardClick={(pid) => navigate(`/property/${pid}`)}
+        />
+      )}
 
       {/* Mobile bottom bar */}
       <BottomActionBar

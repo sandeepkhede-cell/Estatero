@@ -6,39 +6,35 @@ import { useFavourites } from './useFavourites';
 
 interface UsePropertiesResult {
   properties: Property[];
-  loading: boolean;
-  error: string | null;
-  page: number;
+  loading:    boolean;
+  error:      string | null;
+  total:      number;
   totalPages: number;
-  total: number;
-  setPage: (page: number) => void;
 }
 
-export const useProperties = (filters?: Partial<FilterState>): UsePropertiesResult => {
-  const { isFavourited }            = useFavourites();
-  const [data, setData]             = useState<PropertyListResponse | null>(null);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState<string | null>(null);
-  const [page, setPage]             = useState(1);
-  const filtersKey                  = JSON.stringify(filters);
+export const useProperties = (filters: FilterState): UsePropertiesResult => {
+  const { isFavourited }      = useFavourites();
+  const [data, setData]       = useState<PropertyListResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState<string | null>(null);
 
-  // Reset to page 1 whenever filters change
-  useEffect(() => { setPage(1); }, [filtersKey]);
+  const filtersKey = JSON.stringify(filters);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
 
-    propertyService.getAll(filters, page)
+    propertyService.getAll(filters)
       .then((res) => { if (!cancelled) setData(res); })
       .catch((err: unknown) => {
-        if (!cancelled) setError((err as Error).message ?? 'Failed to load properties');
+        if (!cancelled)
+          setError((err as Error).message ?? 'Failed to load properties');
       })
       .finally(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };
-  }, [page, filtersKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filtersKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const properties = (data?.properties ?? []).map((p) => ({
     ...p,
@@ -49,9 +45,7 @@ export const useProperties = (filters?: Partial<FilterState>): UsePropertiesResu
     properties,
     loading,
     error,
-    page,
-    totalPages: data?.totalPages ?? 1,
     total:      data?.total      ?? 0,
-    setPage,
+    totalPages: data?.totalPages ?? 1,
   };
 };

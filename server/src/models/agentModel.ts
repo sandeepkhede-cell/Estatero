@@ -3,12 +3,37 @@ import { AgentRow, AgentDTO } from '../types';
 
 function toDTO(row: AgentRow): AgentDTO {
   return {
-    id:     row.id,
-    name:   row.name,
-    role:   row.agency_name ?? 'Independent Agent',
-    avatar: row.profile_image ?? '',
-    phone:  row.phone ?? undefined,
+    id:            row.id,
+    name:          row.name,
+    role:          row.agency_name ?? 'Independent Agent',
+    avatar:        row.profile_image ?? '',
+    phone:         row.phone ?? undefined,
+    bio:           row.bio ?? undefined,
+    rating:        parseFloat(row.rating),
+    listingsCount: row.listings_count,
   };
+}
+
+export async function findAllAgents(search?: string): Promise<AgentDTO[]> {
+  const values: unknown[] = [];
+  let where = '';
+
+  if (search?.trim()) {
+    values.push(`%${search.trim()}%`);
+    where = `WHERE u.name ILIKE $1 OR ag.agency_name ILIKE $1`;
+  }
+
+  const { rows } = await pool.query<AgentRow>(
+    `SELECT ag.id, ag.user_id, ag.agency_name, ag.license_number,
+            ag.bio, ag.profile_image, ag.rating, ag.listings_count,
+            u.name, u.phone
+     FROM agents ag
+     JOIN users u ON u.id = ag.user_id
+     ${where}
+     ORDER BY ag.listings_count DESC, ag.rating DESC`,
+    values,
+  );
+  return rows.map(toDTO);
 }
 
 export async function findAgentById(id: number): Promise<AgentDTO | null> {

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import * as propertyModel from '../models/propertyModel';
 import { PropertyFilters } from '../types';
+import { AuthRequest } from '../middleware/auth';
 
 export async function getProperties(req: Request, res: Response, next: NextFunction) {
   try {
@@ -10,6 +11,8 @@ export async function getProperties(req: Request, res: Response, next: NextFunct
       status:       req.query.status       as string,
       bhk:          req.query.bhk          as string | string[],
       priceRange:   req.query.priceRange   ? Number(req.query.priceRange) : undefined,
+      furnishing:   req.query.furnishing   as string,
+      availability: req.query.availability as string,
       sortBy:       req.query.sortBy       as PropertyFilters['sortBy'],
       q:            req.query.q            as string,
       page:         req.query.page         ? Number(req.query.page) : 1,
@@ -57,6 +60,49 @@ export async function searchProperties(req: Request, res: Response, next: NextFu
     }
     const properties = await propertyModel.searchProperties(q);
     res.json(properties);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function createProperty(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const input = req.body as propertyModel.CreatePropertyInput;
+    if (!input.title || !input.price || !input.location || !input.city || !input.property_type) {
+      res.status(400).json({ error: 'title, price, location, city, property_type are required' });
+      return;
+    }
+    const property = await propertyModel.createProperty(input);
+    res.status(201).json(property);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateProperty(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid property ID' }); return; }
+
+    const existing = await propertyModel.findPropertyById(id);
+    if (!existing) { res.status(404).json({ error: 'Property not found' }); return; }
+
+    const property = await propertyModel.updateProperty(id, req.body as propertyModel.UpdatePropertyInput);
+    res.json(property);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function deleteProperty(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid property ID' }); return; }
+
+    const deleted = await propertyModel.deleteProperty(id);
+    if (!deleted) { res.status(404).json({ error: 'Property not found' }); return; }
+
+    res.status(204).send();
   } catch (err) {
     next(err);
   }

@@ -31,7 +31,7 @@ const MobileNav = ({ tabs = defaultTabs }: MobileNavProps) => {
           key={tab.label}
           onClick={() => tab.path ? navigate(tab.path) : tab.onClick?.()}
           className={`flex flex-col items-center justify-center scale-95 transition-transform duration-100 ${
-            isActive(tab) ? 'text-blue-600' : 'text-gray-500'
+            isActive(tab) ? 'text-primary' : 'text-gray-500'
           }`}
         >
           <span

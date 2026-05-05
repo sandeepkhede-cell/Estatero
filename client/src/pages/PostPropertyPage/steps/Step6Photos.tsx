@@ -1,0 +1,128 @@
+import { useRef, useState } from 'react';
+import { PostPropertyForm } from '../types';
+
+interface Props {
+  form: PostPropertyForm;
+  onChange: (patch: Partial<PostPropertyForm>) => void;
+}
+
+const Step6Photos = ({ form, onChange }: Props) => {
+  const [urlInput, setUrlInput]   = useState('');
+  const [dragOver, setDragOver]   = useState(false);
+  const fileRef                   = useRef<HTMLInputElement>(null);
+
+  const addUrls = (urls: string[]) => {
+    const valid = urls.map((u) => u.trim()).filter((u) => u.startsWith('http'));
+    if (!valid.length) return;
+    const next = [...new Set([...form.imageUrls, ...valid])].slice(0, 15);
+    onChange({ imageUrls: next });
+  };
+
+  const handleFiles = (files: FileList | null) => {
+    if (!files) return;
+    // Create object URLs for local preview — these are transient
+    const urls = Array.from(files)
+      .filter((f) => f.type.startsWith('image/'))
+      .map((f) => URL.createObjectURL(f));
+    addUrls(urls);
+  };
+
+  const remove = (url: string) =>
+    onChange({ imageUrls: form.imageUrls.filter((u) => u !== url) });
+
+  const handleUrlAdd = () => {
+    addUrls([urlInput]);
+    setUrlInput('');
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Drop zone */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
+        onClick={() => fileRef.current?.click()}
+        className={[
+          'border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-colors',
+          dragOver
+            ? 'border-primary bg-primary-fixed'
+            : 'border-outline-variant hover:border-primary hover:bg-surface-container-low',
+        ].join(' ')}
+      >
+        <span className="material-symbols-outlined text-4xl text-outline mb-3 block">
+          cloud_upload
+        </span>
+        <p className="text-sm font-semibold text-on-surface">
+          Drag & drop photos here, or click to browse
+        </p>
+        <p className="text-xs text-on-surface-variant mt-1">
+          Up to 15 photos · JPG, PNG, WEBP
+        </p>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => handleFiles(e.target.files)}
+        />
+      </div>
+
+      {/* URL input fallback */}
+      <div className="flex gap-2">
+        <input
+          type="url"
+          value={urlInput}
+          onChange={(e) => setUrlInput(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleUrlAdd()}
+          placeholder="Or paste an image URL and press Enter"
+          className="flex-1 border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+        />
+        <button
+          type="button"
+          onClick={handleUrlAdd}
+          disabled={!urlInput.trim()}
+          className="px-4 py-2.5 bg-primary text-white rounded-lg text-sm font-semibold disabled:opacity-40"
+        >
+          Add
+        </button>
+      </div>
+
+      {/* Thumbnail grid */}
+      {form.imageUrls.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-3">
+            {form.imageUrls.length} / 15 photos
+          </p>
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+            {form.imageUrls.map((url, i) => (
+              <div key={url} className="relative group aspect-square rounded-xl overflow-hidden bg-surface-container">
+                <img
+                  src={url}
+                  alt={`Photo ${i + 1}`}
+                  className="w-full h-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).src = ''; }}
+                />
+                {i === 0 && (
+                  <span className="absolute bottom-1 left-1 bg-primary text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                    Cover
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => remove(url)}
+                  className="absolute top-1 right-1 w-6 h-6 bg-black/60 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <span className="material-symbols-outlined text-[14px]">close</span>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Step6Photos;

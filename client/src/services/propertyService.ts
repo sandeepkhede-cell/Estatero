@@ -22,12 +22,14 @@ function parseBhk(label: string): string {
   return label.replace(/\D/g, '').slice(0, 1);
 }
 
-function buildQuery(filters: Partial<FilterState>, page: number): string {
+function buildQuery(filters: Partial<FilterState>): string {
   const params = new URLSearchParams();
-  params.set('page', String(page));
+  params.set('page', String(filters.page ?? 1));
 
-  // Slider 0-100 → rupees. 100 means "no limit" — omit param.
-  if (filters.priceRange !== undefined && filters.priceRange < 100) {
+  // maxPrice takes priority over the 0-100 slider value
+  if (filters.maxPrice) {
+    params.set('priceRange', String(filters.maxPrice));
+  } else if (filters.priceRange !== undefined && filters.priceRange < 100) {
     params.set('priceRange', String(filters.priceRange * 1_000_000));
   }
 
@@ -43,13 +45,14 @@ function buildQuery(filters: Partial<FilterState>, page: number): string {
   if (filters.city)   params.set('city', filters.city);
   if (filters.status) params.set('status', filters.status);
   if (filters.sortBy) params.set('sortBy', filters.sortBy);
+  if (filters.limit)  params.set('limit', String(filters.limit));
 
   return params.toString();
 }
 
 export const propertyService = {
-  getAll: (filters?: Partial<FilterState>, page = 1) =>
-    api.get<PropertyListResponse>(`/properties?${buildQuery(filters ?? {}, page)}`),
+  getAll: (filters?: Partial<FilterState>) =>
+    api.get<PropertyListResponse>(`/properties?${buildQuery(filters ?? {})}`),
 
   getById: (id: string | number) =>
     api.get<Property>(`/properties/${id}`),
@@ -59,4 +62,7 @@ export const propertyService = {
 
   getFeatured: () =>
     api.get<Property[]>('/properties/featured'),
+
+  create: (body: Record<string, unknown>) =>
+    api.post<Property>('/properties', body),
 };

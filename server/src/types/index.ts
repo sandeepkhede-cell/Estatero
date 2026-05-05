@@ -12,15 +12,20 @@ export interface PropertyRow {
   state: string | null;
   latitude: string | null;
   longitude: string | null;
-  property_type: string;
-  status: string;
-  bedrooms: number | null;
-  bathrooms: number | null;
-  area_sqft: number | null;
-  floor: number | null;
-  total_floors: number | null;
-  facing: string | null;
-  badge: string | null;
+  property_type:   string;
+  status:          string;
+  bedrooms:        number | null;
+  bathrooms:       number | null;
+  area_sqft:       number | null;
+  floor:           number | null;
+  total_floors:    number | null;
+  facing:          string | null;
+  furnishing:      string | null;
+  availability:    string | null;
+  age_of_property: string | null;
+  rera_registered: boolean;
+  rera_number:     string | null;
+  badge:           string | null;
   badge_variant: string | null;
   is_verified: boolean;
   is_featured: boolean;
@@ -74,30 +79,40 @@ export interface AgentDTO {
   role: string;
   avatar: string;
   phone?: string;
+  bio?: string;
+  rating?: number;
+  listingsCount?: number;
 }
 
 export interface PropertyDTO {
-  id: number;
-  title: string;
-  description: string;
-  price: string;
-  pricePerSqft?: string;
-  emi?: string;
-  location: string;
-  image: string;
-  images?: string[];
-  badge?: string;
-  badgeVariant?: 'primary' | 'secondary';
-  isVerified: boolean;
-  isFavourited?: boolean;
-  status: string;
-  area?: string;
-  floor?: string;
-  facing?: string;
-  meta: PropertyMeta[];
-  amenities?: Amenity[];
-  nearbyPlaces?: NearbyPlace[];
-  agent?: AgentDTO;
+  id:              number;
+  title:           string;
+  description:     string;
+  price:           number;
+  pricePerSqft?:   string;
+  emi?:            string;
+  location:        string;
+  image:           string;
+  images?:         string[];
+  badge?:          string;
+  badgeVariant?:   'primary' | 'secondary';
+  isVerified:      boolean;
+  isFavourited?:   boolean;
+  // listing kind
+  listingType:     string;   // 'For Sale' | 'For Rent' | 'PG'
+  // property detail
+  area?:           string;
+  floor?:          string;
+  facing?:         string;
+  furnishing?:     string;
+  availability?:   string;
+  ageOfProperty?:  string;
+  isReraRegistered: boolean;
+  reraNumber?:     string;
+  meta:            PropertyMeta[];
+  amenities?:      Amenity[];
+  nearbyPlaces?:   NearbyPlace[];
+  agent?:          AgentDTO;
 }
 
 export interface PropertyListResponse {
@@ -115,13 +130,15 @@ export interface LocationSuggestion {
 // ── Query filter shape ───────────────────────────────────────────────────────
 
 export interface PropertyFilters {
-  city?: string;
+  city?:         string;
   propertyType?: string;
-  status?: string;
-  bhk?: string | string[];
-  priceRange?: number;        // max price
-  sortBy?: 'newest' | 'price_asc' | 'price_desc';
-  q?: string;
-  page?: number;
-  limit?: number;
+  status?:       string;
+  bhk?:          string | string[];
+  priceRange?:   number;   // max price in rupees
+  furnishing?:   string;
+  availability?: string;
+  sortBy?:       'newest' | 'price_asc' | 'price_desc';
+  q?:            string;
+  page?:         number;
+  limit?:        number;
 }

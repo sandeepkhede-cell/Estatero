@@ -59,7 +59,7 @@ const SearchBanner = ({
   };
 
   return (
-    <div className="bg-white p-sm md:p-md rounded-xl shadow-2xl max-w-5xl mx-auto">
+    <div className="bg-transparent">
       <div className="flex flex-col md:flex-row items-center gap-2">
 
         {/* City / Locality — with autocomplete */}

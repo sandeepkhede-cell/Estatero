@@ -1,8 +1,10 @@
+import { formatINR } from '../../utils/formatINR';
+
 interface PropertyInfoRowProps {
-  title: string;
-  location: string;
-  price: string;
-  pricePerSqft?: string;
+  title:              string;
+  location:           string;
+  price:              number;
+  pricePerSqft?:      string;
   hidePriceOnDesktop?: boolean;
 }
 
@@ -22,7 +24,7 @@ const PropertyInfoRow = ({
       </p>
     </div>
     <div className={`text-right flex-shrink-0 ${hidePriceOnDesktop ? 'lg:hidden' : ''}`}>
-      <p className="font-price-display text-price-display text-primary">{price}</p>
+      <p className="font-price-display text-price-display text-primary">{formatINR(price)}</p>
       {pricePerSqft && (
         <p className="font-label-bold text-label-bold text-on-surface-variant mt-1">{pricePerSqft}</p>
       )}

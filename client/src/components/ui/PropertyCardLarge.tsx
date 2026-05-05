@@ -1,4 +1,5 @@
 import { Property } from '../../types/property';
+import { formatINR } from '../../utils/formatINR';
 import FavouriteButton from './FavouriteButton';
 import BadgeLabel from './BadgeLabel';
 import PropertyMeta from './PropertyMeta';
@@ -38,7 +39,7 @@ const PropertyCardLarge = ({ property, onCardClick, onFavourite }: PropertyCardL
 
       <div className="p-md">
         <div className="flex justify-between items-start mb-2">
-          <span className="font-price-display text-primary text-price-display">{price}</span>
+          <span className="font-price-display text-primary text-price-display">{formatINR(price)}</span>
           {isVerified && (
             <div className="flex items-center gap-1 text-green-600 bg-green-50 px-2 py-0.5 rounded-lg">
               <span className="material-symbols-outlined text-[16px]">verified</span>

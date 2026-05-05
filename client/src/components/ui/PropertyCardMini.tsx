@@ -1,4 +1,5 @@
 import { Property } from '../../types/property';
+import { formatINR } from '../../utils/formatINR';
 import FavouriteButton from './FavouriteButton';
 import PropertyMeta from './PropertyMeta';
 
@@ -37,7 +38,7 @@ const PropertyCardMini = ({ property, onCardClick, onFavourite }: PropertyCardMi
       </div>
 
       <div className="p-md">
-        <div className="font-price-display text-primary-container mb-1">{price}</div>
+        <div className="font-price-display text-primary-container mb-1">{formatINR(price)}</div>
         <h4 className="font-label-bold text-on-surface truncate">{title}</h4>
         <p className="text-body-sm text-outline-variant truncate mb-3">{description}</p>
         <PropertyMeta items={meta} size="sm" />

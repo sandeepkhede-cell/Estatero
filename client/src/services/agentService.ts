@@ -10,6 +10,13 @@ export interface ContactPayload {
 }
 
 export const agentService = {
+  getAll: (search?: string) => {
+    const params = new URLSearchParams();
+    if (search?.trim()) params.set('search', search.trim());
+    const qs = params.toString();
+    return api.get<{ agents: Agent[]; total: number }>(`/agents${qs ? `?${qs}` : ''}`);
+  },
+
   getById: (id: string | number) =>
     api.get<Agent>(`/agents/${id}`),
 

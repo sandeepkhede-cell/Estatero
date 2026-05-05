@@ -1,4 +1,5 @@
 import { Property } from '../../types/property';
+import { formatINR } from '../../utils/formatINR';
 import FavouriteButton from './FavouriteButton';
 import VerifiedBadge from './VerifiedBadge';
 import PropertySpecsRow from './PropertySpecsRow';
@@ -47,7 +48,7 @@ const PropertyCard = ({ property, onCardClick, onFavourite }: PropertyCardProps)
 
       <div className="p-md space-y-sm">
         <div className="flex justify-between items-start">
-          <span className="font-price-display text-price-display text-primary">{price}</span>
+          <span className="font-price-display text-price-display text-primary">{formatINR(price)}</span>
           {emi && <span className="text-body-sm text-outline">EMI starts at {emi}</span>}
         </div>
 

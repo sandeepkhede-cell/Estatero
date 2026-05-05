@@ -8,6 +8,7 @@ import propertyRoutes from './routes/properties';
 import searchRoutes   from './routes/search';
 import agentRoutes    from './routes/agents';
 import authRoutes     from './routes/auth';
+import userRoutes     from './routes/users';
 import { notFound, errorHandler } from './middleware/errorHandler';
 
 dotenv.config();
@@ -29,6 +30,7 @@ app.use('/api/auth',       authRoutes);
 app.use('/api/properties', propertyRoutes);
 app.use('/api/search',     searchRoutes);
 app.use('/api/agents',     agentRoutes);
+app.use('/api/users',      userRoutes);
 
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));

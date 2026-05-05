@@ -3,14 +3,6 @@ import { PropertyRow, PropertyFilters, PropertyDTO, PropertyListResponse } from 
 
 const PAGE_SIZE = 12;
 
-// ── Format helpers ────────────────────────────────────────────────────────────
-
-function formatPrice(rupees: number): string {
-  if (rupees >= 10_000_000) return `₹${(rupees / 10_000_000).toFixed(2)} Cr`;
-  if (rupees >= 100_000)    return `₹${(rupees / 100_000).toFixed(2)} L`;
-  return `₹${rupees.toLocaleString('en-IN')}`;
-}
-
 function toDTO(row: PropertyRow): PropertyDTO {
   const meta = [];
   if (row.bedrooms)  meta.push({ icon: 'bed',        value: `${row.bedrooms} BHK` });
@@ -23,7 +15,7 @@ function toDTO(row: PropertyRow): PropertyDTO {
     id:           row.id,
     title:        row.title,
     description:  row.description ?? '',
-    price:        formatPrice(row.price),
+    price:        row.price,
     pricePerSqft: row.price_per_sqft ? `₹${row.price_per_sqft}/sqft` : undefined,
     emi:          row.emi ? `₹${row.emi.toLocaleString('en-IN')}/mo` : undefined,
     location:     row.location,
@@ -31,11 +23,18 @@ function toDTO(row: PropertyRow): PropertyDTO {
     images:       images.length > 0 ? images : undefined,
     badge:        row.badge ?? undefined,
     badgeVariant: (row.badge_variant as 'primary' | 'secondary') ?? 'primary',
-    isVerified:   row.is_verified,
-    status:       row.status === 'for_sale' ? 'For Sale' : 'For Rent',
-    area:         row.area_sqft ? `${row.area_sqft} sqft` : undefined,
-    floor:        row.floor != null ? `Floor ${row.floor}/${row.total_floors ?? '?'}` : undefined,
-    facing:       row.facing ?? undefined,
+    isVerified:      row.is_verified,
+    listingType:     row.status === 'for_sale' ? 'For Sale'
+                   : row.status === 'for_rent' ? 'For Rent'
+                   : 'PG',
+    area:            row.area_sqft ? `${row.area_sqft} sqft` : undefined,
+    floor:           row.floor != null ? `Floor ${row.floor}/${row.total_floors ?? '?'}` : undefined,
+    facing:          row.facing        ?? undefined,
+    furnishing:      row.furnishing    ?? undefined,
+    availability:    row.availability  ?? undefined,
+    ageOfProperty:   row.age_of_property ?? undefined,
+    isReraRegistered: row.rera_registered,
+    reraNumber:      row.rera_number   ?? undefined,
     meta,
     amenities:    row.amenities ?? undefined,
     nearbyPlaces: row.nearby_places ?? undefined,
@@ -116,6 +115,14 @@ export async function findProperties(filters: PropertyFilters): Promise<Property
       params.push(nums);
     }
   }
+  if (filters.furnishing) {
+    conditions.push(`p.furnishing = $${i++}`);
+    params.push(filters.furnishing);
+  }
+  if (filters.availability) {
+    conditions.push(`p.availability = $${i++}`);
+    params.push(filters.availability);
+  }
   if (filters.q) {
     conditions.push(
       `to_tsvector('english', p.title || ' ' || p.location || ' ' || p.city)
@@ -189,6 +196,101 @@ export async function searchProperties(q: string): Promise<PropertyDTO[]> {
      ORDER BY p.created_at DESC
      LIMIT 20`,
     [q]
+  );
+  return rows.map(toDTO);
+}
+
+// ── Mutations ─────────────────────────────────────────────────────────────────
+
+export interface CreatePropertyInput {
+  title: string;
+  description?: string;
+  price: number;
+  price_per_sqft?: number;
+  emi?: number;
+  location: string;
+  city: string;
+  state?: string;
+  latitude?: number;
+  longitude?: number;
+  property_type: string;
+  status?: string;
+  bedrooms?: number;
+  bathrooms?: number;
+  area_sqft?: number;
+  floor?: number;
+  total_floors?: number;
+  facing?: string;
+  furnishing?: string;
+  availability?: string;
+  age_of_property?: string;
+  rera_registered?: boolean;
+  rera_number?: string;
+  badge?: string;
+  badge_variant?: string;
+  is_verified?: boolean;
+  is_featured?: boolean;
+  agent_id?: number;
+  imageUrls?: string[];   // handled separately — not a DB column
+}
+
+export type UpdatePropertyInput = Partial<CreatePropertyInput>;
+
+export async function createProperty(input: CreatePropertyInput): Promise<PropertyDTO> {
+  const { imageUrls, ...rest } = input;
+
+  const cols = Object.keys(rest) as (keyof typeof rest)[];
+  const vals = cols.map((k) => (rest as Record<string, unknown>)[k]);
+  const placeholders = cols.map((_, i) => `$${i + 1}`).join(', ');
+
+  const { rows } = await pool.query<{ id: number }>(
+    `INSERT INTO properties (${cols.join(', ')}) VALUES (${placeholders}) RETURNING id`,
+    vals,
+  );
+  const propertyId = rows[0].id;
+
+  if (imageUrls?.length) {
+    const imgValues = imageUrls
+      .map((url, i) => `($1, $${i + 2}, ${i === 0}, ${i})`)
+      .join(', ');
+    await pool.query(
+      `INSERT INTO property_images (property_id, url, is_primary, sort_order) VALUES ${imgValues}`,
+      [propertyId, ...imageUrls],
+    );
+  }
+
+  const created = await findPropertyById(propertyId);
+  return created!;
+}
+
+export async function updateProperty(id: number, input: UpdatePropertyInput): Promise<PropertyDTO | null> {
+  const cols = Object.keys(input) as (keyof UpdatePropertyInput)[];
+  if (!cols.length) return findPropertyById(id);
+
+  const sets = cols.map((k, i) => `${k} = $${i + 1}`).join(', ');
+  const vals = cols.map((k) => input[k]);
+  vals.push(id as unknown as string);
+
+  const { rowCount } = await pool.query(
+    `UPDATE properties SET ${sets}, updated_at = NOW() WHERE id = $${cols.length + 1}`,
+    vals,
+  );
+  if (!rowCount) return null;
+  return findPropertyById(id);
+}
+
+export async function deleteProperty(id: number): Promise<boolean> {
+  const { rowCount } = await pool.query('DELETE FROM properties WHERE id = $1', [id]);
+  return (rowCount ?? 0) > 0;
+}
+
+export async function findPropertiesByAgentUserId(userId: number): Promise<PropertyDTO[]> {
+  const { rows } = await pool.query<PropertyRow>(
+    `${BASE_SELECT}
+     WHERE ag.user_id = $1
+     GROUP BY p.id, u.name, u.phone, ag.bio, ag.profile_image
+     ORDER BY p.created_at DESC`,
+    [userId],
   );
   return rows.map(toDTO);
 }

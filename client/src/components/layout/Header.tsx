@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useAuthModal } from '../../context/AuthModalContext';
 
 interface NavLink {
   label: string;
@@ -16,10 +17,10 @@ interface HeaderProps {
 
 const defaultNavLinks: NavLink[] = [
   { label: 'Buy',        to: '/listings' },
-  { label: 'Rent',       href: '#' },
-  { label: 'Commercial', href: '#' },
-  { label: 'PG',         href: '#' },
-  { label: 'Find Agent', href: '#' },
+  { label: 'Rent',       to: '/listings?type=for_rent' },
+  { label: 'Commercial', to: '/listings?pt=commercial' },
+  { label: 'PG',         to: '/listings?type=pg' },
+  { label: 'Find Agent', to: '/agents' },
 ];
 
 const Header = ({
@@ -30,6 +31,7 @@ const Header = ({
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { open: openAuthModal } = useAuthModal();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -61,7 +63,7 @@ const Header = ({
     <header className="bg-white dark:bg-gray-950 border-b border-gray-100 dark:border-gray-800 shadow-sm sticky top-0 z-50">
       <div className="flex justify-between items-center w-full px-6 py-3 max-w-[1200px] mx-auto font-manrope antialiased">
 
-        <Link to="/" className="text-xl font-extrabold text-blue-600 tracking-tight">
+        <Link to="/" className="text-xl font-extrabold text-primary tracking-tight">
           {brandName}
         </Link>
 
@@ -73,8 +75,8 @@ const Header = ({
                 to={link.to}
                 className={
                   isActive(link)
-                    ? 'text-blue-600 border-b-2 border-blue-600 font-semibold pb-1 transition-colors'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-blue-600 transition-colors pb-1'
+                    ? 'text-primary border-b-2 border-primary font-semibold pb-1 transition-colors'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-primary transition-colors pb-1'
                 }
               >
                 {link.label}
@@ -83,7 +85,7 @@ const Header = ({
               <a
                 key={link.label}
                 href={link.href ?? '#'}
-                className="text-gray-600 dark:text-gray-400 hover:text-blue-600 transition-colors"
+                className="text-gray-600 dark:text-gray-400 hover:text-primary transition-colors"
               >
                 {link.label}
               </a>
@@ -117,7 +119,7 @@ const Header = ({
                   onClick={() => setMenuOpen((o) => !o)}
                   className="flex items-center gap-2 hover:bg-gray-50 rounded-full pl-1 pr-3 py-1 transition-all"
                 >
-                  <div className="w-8 h-8 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center">
                     {initials}
                   </div>
                   <span className="hidden sm:block text-sm font-semibold text-gray-700 max-w-[100px] truncate">
@@ -134,6 +136,13 @@ const Header = ({
                       <p className="text-sm font-semibold text-gray-800 truncate">{user.name}</p>
                       <p className="text-xs text-gray-500 truncate">{user.email}</p>
                     </div>
+                    <button
+                      onClick={() => { navigate('/profile'); setMenuOpen(false); }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">person</span>
+                      My Profile
+                    </button>
                     <button
                       onClick={() => { navigate('/saved'); setMenuOpen(false); }}
                       className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
@@ -153,8 +162,8 @@ const Header = ({
               </div>
             ) : (
               <button
-                onClick={() => navigate('/auth')}
-                className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 hover:text-blue-600 hover:bg-gray-50 px-3 py-2 rounded-lg transition-all"
+                onClick={() => openAuthModal('login')}
+                className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 hover:text-primary hover:bg-gray-50 px-3 py-2 rounded-lg transition-all"
               >
                 <span className="material-symbols-outlined text-[20px]">account_circle</span>
                 <span className="hidden sm:block">Sign In</span>
@@ -162,7 +171,11 @@ const Header = ({
             )}
 
             <button
-              onClick={onPostProperty}
+              onClick={() => {
+                onPostProperty?.();
+                if (user) navigate('/post-property');
+                else openAuthModal('register');
+              }}
               className="hidden sm:block bg-primary-container text-on-primary font-label-bold px-4 py-2 rounded-lg hover:bg-primary transition-all"
             >
               Post Property
