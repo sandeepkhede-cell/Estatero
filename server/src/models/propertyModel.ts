@@ -139,6 +139,15 @@ export async function findProperties(filters: PropertyFilters): Promise<Property
     conditions.push(`p.age_of_property = $${i++}`);
     params.push(filters.ageOfProperty);
   }
+  if (filters.postedBy) {
+    if (filters.postedBy === 'owner') {
+      conditions.push(`(ag.agency_name IS NULL OR ag.agency_name = '')`);
+    } else if (filters.postedBy === 'agent') {
+      conditions.push(`(ag.agency_name IS NOT NULL AND ag.agency_name != '')`);
+    } else if (filters.postedBy === 'builder') {
+      conditions.push(`(ag.agency_name ILIKE '%builder%' OR ag.agency_name ILIKE '%construction%' OR ag.agency_name ILIKE '%developer%')`);
+    }
+  }
   if (filters.q) {
     conditions.push(
       `to_tsvector('english', p.title || ' ' || p.location || ' ' || p.city)
@@ -247,13 +256,14 @@ export interface CreatePropertyInput {
   is_verified?: boolean;
   is_featured?: boolean;
   agent_id?: number;
-  imageUrls?: string[];   // handled separately — not a DB column
+  imageUrls?: string[];                          // handled separately — not a DB column
+  amenities?: { icon: string; label: string }[]; // handled separately — not a DB column
 }
 
 export type UpdatePropertyInput = Partial<CreatePropertyInput>;
 
 export async function createProperty(input: CreatePropertyInput): Promise<PropertyDTO> {
-  const { imageUrls, ...rest } = input;
+  const { imageUrls, amenities, ...rest } = input;
 
   const cols = Object.keys(rest) as (keyof typeof rest)[];
   const vals = cols.map((k) => (rest as Record<string, unknown>)[k]);
@@ -273,6 +283,22 @@ export async function createProperty(input: CreatePropertyInput): Promise<Proper
       `INSERT INTO property_images (property_id, url, is_primary, sort_order) VALUES ${imgValues}`,
       [propertyId, ...imageUrls],
     );
+  }
+
+  if (amenities?.length) {
+    for (const { icon, label } of amenities) {
+      const { rows: aRows } = await pool.query<{ id: number }>(
+        `INSERT INTO amenities (icon, label) VALUES ($1, $2)
+         ON CONFLICT (label) DO UPDATE SET icon = EXCLUDED.icon
+         RETURNING id`,
+        [icon, label],
+      );
+      await pool.query(
+        `INSERT INTO property_amenities (property_id, amenity_id) VALUES ($1, $2)
+         ON CONFLICT DO NOTHING`,
+        [propertyId, aRows[0].id],
+      );
+    }
   }
 
   const created = await findPropertyById(propertyId);

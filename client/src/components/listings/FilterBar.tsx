@@ -49,8 +49,6 @@ const FilterBar = ({ filters, onFilterChange }: FilterBarProps) => {
   const toggleRTM = () =>
     onFilterChange('availability', isReadyToMove ? undefined : 'ready-to-move');
 
-  const isReraFilter = false; // placeholder — backend filter not wired yet
-
   return (
     <div className="sticky top-[61px] z-40 bg-white border-b border-outline-variant overflow-x-auto px-6 py-2.5 flex items-center gap-2">
       <span className="material-symbols-outlined text-on-surface-variant text-[18px] flex-shrink-0">tune</span>
@@ -68,9 +66,8 @@ const FilterBar = ({ filters, onFilterChange }: FilterBarProps) => {
       <div className="h-5 w-px bg-outline-variant mx-1 flex-shrink-0" />
 
       {/* Quick attribute filters */}
-      <Pill label="Ready to Move" active={isReadyToMove} onToggle={toggleRTM} />
+      <Pill label="Ready to Move"  active={isReadyToMove} onToggle={toggleRTM} />
       <Pill label="Fully Furnished" active={!!hasFurnished} onToggle={toggleFurnished} />
-      <Pill label="RERA Verified"   active={isReraFilter}  onToggle={() => {}} />
     </div>
   );
 };

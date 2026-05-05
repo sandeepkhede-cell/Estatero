@@ -15,6 +15,7 @@ export async function getProperties(req: Request, res: Response, next: NextFunct
       furnishing:    req.query.furnishing    as string | string[],
       availability:  req.query.availability  as string,
       ageOfProperty: req.query.ageOfProperty as string,
+      postedBy:      req.query.postedBy      as string,
       sortBy:        req.query.sortBy        as PropertyFilters['sortBy'],
       q:             req.query.q             as string,
       page:          req.query.page          ? Number(req.query.page) : 1,

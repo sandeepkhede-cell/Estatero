@@ -138,6 +138,7 @@ export interface PropertyFilters {
   furnishing?:    string | string[];
   availability?:  string;
   ageOfProperty?: string;
+  postedBy?:      string;
   sortBy?:        'newest' | 'price_asc' | 'price_desc';
   q?:             string;
   page?:          number;

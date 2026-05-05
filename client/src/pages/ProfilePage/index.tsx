@@ -6,6 +6,7 @@ import { userService, UserProfile } from '../../services/userService';
 import { Property } from '../../types/property';
 import PropertyCard from '../../components/ui/PropertyCard';
 import { useFavourites } from '../../hooks/useFavourites';
+import { useSavedProperties } from '../../hooks/useSavedProperties';
 
 type Tab = 'listings' | 'saved';
 
@@ -16,6 +17,7 @@ const ProfilePage = () => {
   const { user, logout }   = useAuth();
   const { open }           = useAuthModal();
   const { toggle }         = useFavourites();
+  const { properties: savedProperties, loading: loadingS } = useSavedProperties();
 
   const [tab,        setTab]        = useState<Tab>('listings');
   const [profile,    setProfile]    = useState<UserProfile | null>(null);
@@ -140,7 +142,7 @@ const ProfilePage = () => {
                   : 'text-on-surface-variant hover:text-on-surface',
               ].join(' ')}
             >
-              {t === 'listings' ? `My Listings (${listings.length})` : 'Saved'}
+              {t === 'listings' ? `My Listings (${listings.length})` : `Saved (${savedProperties.length})`}
             </button>
           ))}
         </div>
@@ -167,11 +169,24 @@ const ProfilePage = () => {
               ))}
             </div>
           )
-        ) : (
-          <div className="flex flex-col items-center py-10 gap-3">
-            <button onClick={() => navigate('/saved')} className="bg-primary text-white px-6 py-2.5 rounded-xl text-sm font-semibold">
-              View Saved Properties
+        ) : loadingS ? (
+          <div className="flex justify-center py-20">
+            <span className="material-symbols-outlined animate-spin text-primary text-5xl">progress_activity</span>
+          </div>
+        ) : savedProperties.length === 0 ? (
+          <div className="flex flex-col items-center py-20 gap-4 text-center">
+            <span className="material-symbols-outlined text-outline text-7xl">favorite_border</span>
+            <h3 className="text-lg font-bold text-on-surface">Nothing saved yet</h3>
+            <p className="text-body-md text-on-surface-variant">Tap the heart on any property to save it here.</p>
+            <button onClick={() => navigate('/listings')} className="mt-2 bg-primary text-white px-8 py-3 rounded-xl font-semibold">
+              Browse Properties
             </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {savedProperties.map((p) => (
+              <PropertyCard key={p.id} property={p} onCardClick={(id) => navigate(`/property/${id}`)} onFavourite={toggle} />
+            ))}
           </div>
         )}
 

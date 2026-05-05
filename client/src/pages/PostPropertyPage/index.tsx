@@ -25,6 +25,25 @@ function validate(step: number, form: PostPropertyForm): string | null {
   return null;
 }
 
+const AMENITY_ICONS: Record<string, string> = {
+  'Lift':                  'elevator',
+  'Parking':               'local_parking',
+  'Gym':                   'fitness_center',
+  'Swimming Pool':         'pool',
+  '24/7 Security':         'security',
+  'Garden / Park':         'yard',
+  'Club House':            'sports_tennis',
+  'Power Backup':          'bolt',
+  '24hr Water Supply':     'water_drop',
+  'High-Speed Internet':   'wifi',
+  'Fire Safety':           'local_fire_department',
+  'CCTV Surveillance':     'videocam',
+  "Children's Play Area":  'child_friendly',
+  'Air Conditioning':      'ac_unit',
+  'Laundry Service':       'local_laundry_service',
+  'Shuttle Service':       'directions_bus',
+};
+
 // ── Form → API payload ────────────────────────────────────────────────────────
 
 function toPayload(form: PostPropertyForm): Record<string, unknown> {
@@ -52,6 +71,9 @@ function toPayload(form: PostPropertyForm): Record<string, unknown> {
     rera_registered: form.rera_registered,
     rera_number:     form.rera_number || undefined,
     imageUrls:       form.imageUrls.length > 0 ? form.imageUrls : undefined,
+    amenities:       form.amenities.length > 0
+                       ? form.amenities.map((label) => ({ icon: AMENITY_ICONS[label] ?? '', label }))
+                       : undefined,
   };
 }
 

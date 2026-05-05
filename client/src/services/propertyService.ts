@@ -65,6 +65,8 @@ function buildQuery(filters: Partial<FilterState>): string {
   // Furnishing — multi-value array
   filters.furnishing?.forEach((f) => params.append('furnishing', f));
 
+  if (filters.postedBy) params.set('postedBy', filters.postedBy);
+
   return params.toString();
 }
 
