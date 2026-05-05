@@ -6,16 +6,17 @@ import { AuthRequest } from '../middleware/auth';
 export async function getProperties(req: Request, res: Response, next: NextFunction) {
   try {
     const filters: PropertyFilters = {
-      city:         req.query.city         as string,
-      propertyType: req.query.propertyType as string,
-      status:       req.query.status       as string,
-      bhk:          req.query.bhk          as string | string[],
-      priceRange:   req.query.priceRange   ? Number(req.query.priceRange) : undefined,
-      furnishing:   req.query.furnishing   as string,
-      availability: req.query.availability as string,
-      sortBy:       req.query.sortBy       as PropertyFilters['sortBy'],
-      q:            req.query.q            as string,
-      page:         req.query.page         ? Number(req.query.page) : 1,
+      city:          req.query.city          as string,
+      propertyType:  req.query.propertyType  as string | string[],
+      status:        req.query.status        as string,
+      bhk:           req.query.bhk           as string | string[],
+      priceRange:    req.query.priceRange    ? Number(req.query.priceRange) : undefined,
+      furnishing:    req.query.furnishing    as string | string[],
+      availability:  req.query.availability  as string,
+      ageOfProperty: req.query.ageOfProperty as string,
+      sortBy:        req.query.sortBy        as PropertyFilters['sortBy'],
+      q:             req.query.q             as string,
+      page:          req.query.page          ? Number(req.query.page) : 1,
     };
     const result = await propertyModel.findProperties(filters);
     res.json(result);

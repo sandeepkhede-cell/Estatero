@@ -130,15 +130,16 @@ export interface LocationSuggestion {
 // ── Query filter shape ───────────────────────────────────────────────────────
 
 export interface PropertyFilters {
-  city?:         string;
-  propertyType?: string;
-  status?:       string;
-  bhk?:          string | string[];
-  priceRange?:   number;   // max price in rupees
-  furnishing?:   string;
-  availability?: string;
-  sortBy?:       'newest' | 'price_asc' | 'price_desc';
-  q?:            string;
-  page?:         number;
-  limit?:        number;
+  city?:          string;
+  propertyType?:  string | string[];
+  status?:        string;
+  bhk?:           string | string[];
+  priceRange?:    number;   // max price in rupees
+  furnishing?:    string | string[];
+  availability?:  string;
+  ageOfProperty?: string;
+  sortBy?:        'newest' | 'price_asc' | 'price_desc';
+  q?:             string;
+  page?:          number;
+  limit?:         number;
 }

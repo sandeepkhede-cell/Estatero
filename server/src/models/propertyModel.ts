@@ -96,8 +96,14 @@ export async function findProperties(filters: PropertyFilters): Promise<Property
     params.push(filters.city);
   }
   if (filters.propertyType) {
-    conditions.push(`p.property_type = $${i++}`);
-    params.push(filters.propertyType);
+    const ptList = Array.isArray(filters.propertyType) ? filters.propertyType : [filters.propertyType];
+    if (ptList.length === 1) {
+      conditions.push(`p.property_type = $${i++}`);
+      params.push(ptList[0]);
+    } else {
+      conditions.push(`p.property_type = ANY($${i++}::text[])`);
+      params.push(ptList);
+    }
   }
   if (filters.status) {
     conditions.push(`p.status = $${i++}`);
@@ -116,12 +122,22 @@ export async function findProperties(filters: PropertyFilters): Promise<Property
     }
   }
   if (filters.furnishing) {
-    conditions.push(`p.furnishing = $${i++}`);
-    params.push(filters.furnishing);
+    const fList = Array.isArray(filters.furnishing) ? filters.furnishing : [filters.furnishing];
+    if (fList.length === 1) {
+      conditions.push(`p.furnishing = $${i++}`);
+      params.push(fList[0]);
+    } else {
+      conditions.push(`p.furnishing = ANY($${i++}::text[])`);
+      params.push(fList);
+    }
   }
   if (filters.availability) {
     conditions.push(`p.availability = $${i++}`);
     params.push(filters.availability);
+  }
+  if (filters.ageOfProperty) {
+    conditions.push(`p.age_of_property = $${i++}`);
+    params.push(filters.ageOfProperty);
   }
   if (filters.q) {
     conditions.push(

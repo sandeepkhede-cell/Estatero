@@ -10,7 +10,7 @@ const defaultTypes = ['Apartment', 'Independent House', 'Villa', 'Plot'];
 
 const PropertyTypeFilter = ({
   types = defaultTypes,
-  selected = ['Apartment'],
+  selected = [],
   onChange,
 }: PropertyTypeFilterProps) => {
   const toggle = (type: string) => {

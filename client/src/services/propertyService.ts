@@ -9,12 +9,23 @@ export interface PropertyListResponse {
   totalPages: number;
 }
 
-// Frontend type labels → backend DB values
+// Display labels AND DB values → DB values
 const PROPERTY_TYPE_MAP: Record<string, string> = {
-  Apartment: 'apartment',
-  Villa: 'villa',
-  Plot: 'plot',
+  'Apartment':         'apartment',
   'Independent House': 'apartment',
+  'Villa':             'villa',
+  'Plot':              'plot',
+  'Commercial':        'commercial',
+  'Builder Floor':     'builder_floor',
+  'Penthouse':         'penthouse',
+  // pass-through for DB values coming from URL (?pt=commercial)
+  'apartment':         'apartment',
+  'villa':             'villa',
+  'plot':              'plot',
+  'commercial':        'commercial',
+  'builder_floor':     'builder_floor',
+  'penthouse':         'penthouse',
+  'pg':                'pg',
 };
 
 // '2 BHK' → '2',  '5+ BHK' → '5'
@@ -33,19 +44,26 @@ function buildQuery(filters: Partial<FilterState>): string {
     params.set('priceRange', String(filters.priceRange * 1_000_000));
   }
 
-  // Only filter by type when exactly one type is selected
-  if (filters.propertyTypes?.length === 1) {
-    const mapped = PROPERTY_TYPE_MAP[filters.propertyTypes[0]];
-    if (mapped) params.set('propertyType', mapped);
+  // Property types — support multi-select, map display names → DB values
+  if (filters.propertyTypes?.length) {
+    filters.propertyTypes
+      .map((t) => PROPERTY_TYPE_MAP[t])
+      .filter(Boolean)
+      .forEach((v) => params.append('propertyType', v));
   }
 
   // BHK — append one param per value so backend receives an array
   filters.bhk?.forEach((b) => params.append('bhk', parseBhk(b)));
 
-  if (filters.city)   params.set('city', filters.city);
-  if (filters.status) params.set('status', filters.status);
-  if (filters.sortBy) params.set('sortBy', filters.sortBy);
-  if (filters.limit)  params.set('limit', String(filters.limit));
+  if (filters.city)         params.set('city', filters.city);
+  if (filters.status)       params.set('status', filters.status);
+  if (filters.sortBy)       params.set('sortBy', filters.sortBy);
+  if (filters.limit)        params.set('limit', String(filters.limit));
+  if (filters.availability) params.set('availability', filters.availability);
+  if (filters.ageOfProperty) params.set('ageOfProperty', filters.ageOfProperty);
+
+  // Furnishing — multi-value array
+  filters.furnishing?.forEach((f) => params.append('furnishing', f));
 
   return params.toString();
 }
