@@ -47,8 +47,18 @@ const Header = ({
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const isActive = (link: NavLink) =>
-    link.to ? location.pathname === link.to : false;
+  const isActive = (link: NavLink) => {
+    if (!link.to) return false;
+    const [linkPath, linkSearch] = link.to.split('?');
+    if (location.pathname !== linkPath) return false;
+    if (!linkSearch) return !location.search;
+    const linkParams = new URLSearchParams(linkSearch);
+    const current   = new URLSearchParams(location.search);
+    for (const [k, v] of linkParams.entries()) {
+      if (current.get(k) !== v) return false;
+    }
+    return true;
+  };
 
   const showInlineSearch = location.pathname !== '/listings';
 
