@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import * as propertyModel from '../models/propertyModel';
 import { PropertyFilters } from '../types';
 import { AuthRequest } from '../middleware/auth';
+import { pool } from '../db/connection';
 
 export async function getProperties(req: Request, res: Response, next: NextFunction) {
   try {
@@ -73,6 +74,16 @@ export async function createProperty(req: AuthRequest, res: Response, next: Next
       res.status(400).json({ error: 'title, price, location, city, property_type are required' });
       return;
     }
+
+    // Find or create agent record for the authenticated user, then link it to the property
+    const { rows } = await pool.query<{ id: number }>(
+      `INSERT INTO agents (user_id) VALUES ($1)
+       ON CONFLICT (user_id) DO UPDATE SET user_id = EXCLUDED.user_id
+       RETURNING id`,
+      [req.user!.userId],
+    );
+    input.agent_id = rows[0].id;
+
     const property = await propertyModel.createProperty(input);
     res.status(201).json(property);
   } catch (err) {

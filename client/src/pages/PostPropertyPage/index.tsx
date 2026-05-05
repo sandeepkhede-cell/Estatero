@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { useAuthModal } from '../../context/AuthModalContext';
 import { PostPropertyForm, EMPTY_FORM, STEPS, generateTitle } from './types';
 import StepIndicator from './StepIndicator';
 import Step1Type      from './steps/Step1Type';
@@ -57,6 +59,16 @@ function toPayload(form: PostPropertyForm): Record<string, unknown> {
 
 const PostPropertyPage = () => {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+  const { open: openAuthModal }        = useAuthModal();
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      openAuthModal('login');
+      navigate('/', { replace: true });
+    }
+  }, [authLoading, user]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [step, setStep]           = useState(0);
   const [form, setForm]           = useState<PostPropertyForm>(EMPTY_FORM);
   const [fieldError, setFieldError] = useState<string | null>(null);
@@ -107,6 +119,12 @@ const PostPropertyPage = () => {
   ];
 
   const isLastStep = step === STEPS.length - 1;
+
+  if (authLoading || !user) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <span className="material-symbols-outlined animate-spin text-primary text-5xl">progress_activity</span>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-surface-bright">

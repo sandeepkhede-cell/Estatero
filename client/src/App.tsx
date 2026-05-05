@@ -5,7 +5,6 @@ import AuthModal from './components/ui/AuthModal';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import MobileNav from './components/layout/MobileNav';
-import ChatFAB from './components/layout/ChatFAB';
 import HomePage from './pages/HomePage';
 import ListingsPage from './pages/ListingsPage';
 import DetailPage from './pages/DetailPage';
@@ -22,7 +21,6 @@ const MainLayout = () => (
     <Outlet />
     <Footer />
     <MobileNav />
-    <ChatFAB />
   </div>
 );
 
