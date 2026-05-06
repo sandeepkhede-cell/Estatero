@@ -197,7 +197,7 @@ const DetailPage = () => {
       />
 
       {/* Contact / Inquiry modal */}
-      {modal && property.agent && (
+      {modal && (
         <ContactModal
           agent={property.agent}
           propertyId={property.id}

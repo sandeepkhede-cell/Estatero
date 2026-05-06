@@ -145,6 +145,25 @@ CREATE TABLE IF NOT EXISTS favourites (
 );
 
 -- ============================================================
+-- INQUIRIES  (contact / send-enquiry form submissions)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS inquiries (
+  id           SERIAL PRIMARY KEY,
+  agent_id     INTEGER               REFERENCES agents(id) ON DELETE SET NULL,
+  property_id  INTEGER               REFERENCES properties(id) ON DELETE SET NULL,
+  sender_name  VARCHAR(255),
+  sender_email VARCHAR(255),
+  sender_phone VARCHAR(30),
+  message      TEXT         NOT NULL,
+  is_read      BOOLEAN      NOT NULL DEFAULT FALSE,
+  created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_inquiries_agent    ON inquiries(agent_id);
+CREATE INDEX IF NOT EXISTS idx_inquiries_property ON inquiries(property_id);
+CREATE INDEX IF NOT EXISTS idx_inquiries_is_read  ON inquiries(is_read) WHERE is_read = FALSE;
+
+-- ============================================================
 -- POPULAR SEARCHES
 -- ============================================================
 CREATE TABLE IF NOT EXISTS popular_searches (

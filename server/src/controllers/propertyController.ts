@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as propertyModel from '../models/propertyModel';
+import { saveContactInquiry } from '../models/agentModel';
 import { PropertyFilters } from '../types';
 import { AuthRequest } from '../middleware/auth';
 import { pool } from '../db/connection';
@@ -116,6 +117,33 @@ export async function deleteProperty(req: AuthRequest, res: Response, next: Next
     if (!deleted) { res.status(404).json({ error: 'Property not found' }); return; }
 
     res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function sendPropertyEnquiry(req: Request, res: Response, next: NextFunction) {
+  try {
+    const propertyId = parseInt(req.params.id, 10);
+    if (isNaN(propertyId)) { res.status(400).json({ error: 'Invalid property ID' }); return; }
+
+    const property = await propertyModel.findPropertyById(propertyId);
+    if (!property) { res.status(404).json({ error: 'Property not found' }); return; }
+
+    const { message, name, email, phone } =
+      req.body as { message?: string; name?: string; email?: string; phone?: string };
+    if (!message?.trim()) { res.status(400).json({ error: 'message is required' }); return; }
+
+    await saveContactInquiry({
+      agentId:    property.agent?.id ? Number(property.agent.id) : null,
+      propertyId,
+      name,
+      email,
+      phone,
+      message,
+    });
+
+    res.json({ success: true });
   } catch (err) {
     next(err);
   }

@@ -5,12 +5,13 @@ import compression from 'compression';
 import dotenv from 'dotenv';
 import path from 'path';
 
-import propertyRoutes from './routes/properties';
-import searchRoutes   from './routes/search';
-import agentRoutes    from './routes/agents';
-import authRoutes     from './routes/auth';
-import userRoutes     from './routes/users';
-import uploadRoutes   from './routes/upload';
+import propertyRoutes  from './routes/properties';
+import searchRoutes    from './routes/search';
+import agentRoutes     from './routes/agents';
+import authRoutes      from './routes/auth';
+import userRoutes      from './routes/users';
+import uploadRoutes    from './routes/upload';
+import inquiryRoutes   from './routes/inquiries';
 import { notFound, errorHandler } from './middleware/errorHandler';
 
 dotenv.config();
@@ -40,6 +41,7 @@ app.use('/api/properties', propertyRoutes);
 app.use('/api/search',     searchRoutes);
 app.use('/api/agents',     agentRoutes);
 app.use('/api/users',      userRoutes);
+app.use('/api/inquiries',  inquiryRoutes);
 
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));

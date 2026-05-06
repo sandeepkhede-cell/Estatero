@@ -51,8 +51,8 @@ export async function findAgentById(id: number): Promise<AgentDTO | null> {
 }
 
 export interface InquiryPayload {
-  agentId:     number;
-  propertyId?: number;
+  agentId?:    number | null;
+  propertyId?: number | null;
   name?:       string;
   email?:      string;
   phone?:      string;
@@ -64,7 +64,7 @@ export async function saveContactInquiry(payload: InquiryPayload): Promise<void>
     `INSERT INTO inquiries (agent_id, property_id, sender_name, sender_email, sender_phone, message)
      VALUES ($1, $2, $3, $4, $5, $6)`,
     [
-      payload.agentId,
+      payload.agentId    ?? null,
       payload.propertyId ?? null,
       payload.name       ?? null,
       payload.email      ?? null,

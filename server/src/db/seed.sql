@@ -26,7 +26,7 @@ INSERT INTO users (id, name, email, password_hash, phone, role) VALUES
   (3, 'Vikram Singh',   'vikram@estatero.in',  '$2b$10$placeholder_hash_3', '+91-9820001003', 'agent')
 ON CONFLICT (id) DO NOTHING;
 
-SELECT setval('users_id_seq', 10);
+SELECT setval('users_id_seq', (SELECT GREATEST(MAX(id), 1) FROM users));
 
 -- ── Agents ───────────────────────────────────────────────────
 INSERT INTO agents (id, user_id, agency_name, bio, profile_image, rating, listings_count) VALUES
@@ -44,7 +44,7 @@ INSERT INTO agents (id, user_id, agency_name, bio, profile_image, rating, listin
    4.60, 7)
 ON CONFLICT (id) DO NOTHING;
 
-SELECT setval('agents_id_seq', 10);
+SELECT setval('agents_id_seq', (SELECT GREATEST(MAX(id), 1) FROM agents));
 
 -- ── Properties ───────────────────────────────────────────────
 -- IDs 1-4 match mockProperties.ts (home page recommended)
@@ -217,7 +217,7 @@ INSERT INTO properties (
 
 ON CONFLICT (id) DO NOTHING;
 
-SELECT setval('properties_id_seq', 20);
+SELECT setval('properties_id_seq', (SELECT GREATEST(MAX(id), 1) FROM properties));
 
 -- ── Property images ───────────────────────────────────────────
 INSERT INTO property_images (property_id, url, is_primary, sort_order) VALUES

@@ -2,11 +2,12 @@ import { useState, FormEvent, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useAuthModal } from '../../context/AuthModalContext';
 import { agentService } from '../../services/agentService';
+import { propertyService } from '../../services/propertyService';
 import type { Agent } from '../../types/property';
 
 interface ContactModalProps {
-  agent:         Agent;
-  propertyId?:   number | string;
+  agent?:        Agent;
+  propertyId:    number | string;
   propertyTitle: string;
   mode:          'contact' | 'inquiry';
   onClose:       () => void;
@@ -25,11 +26,10 @@ const ContactModal = ({ agent, propertyId, propertyTitle, mode, onClose }: Conta
   const [done,    setDone]    = useState(false);
   const [error,   setError]   = useState('');
 
-  // Sync auth fields if user signs in while modal is open
   useEffect(() => {
     if (user) {
-      setName((n)  => n  || user.name);
-      setEmail((e) => e  || user.email);
+      setName((n) => n  || user.name);
+      setEmail((e) => e || user.email);
     }
   }, [user]);
 
@@ -39,7 +39,11 @@ const ContactModal = ({ agent, propertyId, propertyTitle, mode, onClose }: Conta
     setError('');
     setBusy(true);
     try {
-      await agentService.contact(agent.id, { name, email, phone, message, propertyId });
+      if (agent) {
+        await agentService.contact(agent.id, { name, email, phone, message, propertyId });
+      } else {
+        await propertyService.sendEnquiry(propertyId, { name, email, phone, message });
+      }
       setDone(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
@@ -48,10 +52,9 @@ const ContactModal = ({ agent, propertyId, propertyTitle, mode, onClose }: Conta
     }
   };
 
-  const title = mode === 'contact' ? 'Contact Agent' : 'Send Inquiry';
+  const title = mode === 'contact' ? 'Contact Agent' : 'Send Enquiry';
 
   return (
-    /* Backdrop */
     <div
       className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
@@ -70,7 +73,6 @@ const ContactModal = ({ agent, propertyId, propertyTitle, mode, onClose }: Conta
         </div>
 
         {done ? (
-          /* Success state */
           <div className="px-6 py-10 flex flex-col items-center gap-4 text-center">
             <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
               <span className="material-symbols-outlined text-green-600 text-[32px]"
@@ -79,53 +81,55 @@ const ContactModal = ({ agent, propertyId, propertyTitle, mode, onClose }: Conta
               </span>
             </div>
             <div>
-              <p className="text-lg font-bold text-gray-900">Inquiry Sent!</p>
+              <p className="text-lg font-bold text-gray-900">Enquiry Sent!</p>
               <p className="text-sm text-gray-500 mt-1">
-                {agent.name} will get back to you shortly.
+                {agent ? `${agent.name} will get back to you shortly.` : 'We will get back to you shortly.'}
               </p>
             </div>
             <button
               onClick={onClose}
-              className="mt-2 bg-primary text-white font-semibold px-8 py-2.5 rounded-lg hover:bg-[#b71c24] transition-colors"
+              className="mt-2 bg-primary text-white font-semibold px-8 py-2.5 rounded-lg hover:opacity-90 transition-opacity"
             >
               Done
             </button>
           </div>
         ) : (
           <>
-            {/* Agent info strip */}
-            <div className="px-6 py-3 bg-red-50 flex items-center gap-3 border-b border-red-100">
-              <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
-                {agent.avatar
-                  ? <img src={agent.avatar} alt={agent.name} className="w-full h-full object-cover" />
-                  : <span className="material-symbols-outlined text-gray-400 text-[24px] m-auto">person</span>
-                }
+            {/* Agent strip — only shown when agent is available */}
+            {agent && (
+              <div className="px-6 py-3 bg-red-50 flex items-center gap-3 border-b border-red-100">
+                <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 flex-shrink-0 flex items-center justify-center">
+                  {agent.avatar
+                    ? <img src={agent.avatar} alt={agent.name} className="w-full h-full object-cover" />
+                    : <span className="material-symbols-outlined text-gray-400 text-[24px]">person</span>
+                  }
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-gray-900 truncate">{agent.name}</p>
+                  <p className="text-xs text-gray-500 truncate">{agent.role}</p>
+                </div>
+                {agent.phone && (
+                  phoneRevealed ? (
+                    <a
+                      href={`tel:${agent.phone}`}
+                      className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-[#b71c24]"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">call</span>
+                      {agent.phone}
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => user ? setPhoneRevealed(true) : openAuthModal('login')}
+                      className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-[#b71c24]"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">call</span>
+                      View Number
+                    </button>
+                  )
+                )}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-gray-900 truncate">{agent.name}</p>
-                <p className="text-xs text-gray-500 truncate">{agent.role}</p>
-              </div>
-              {agent.phone && (
-                phoneRevealed ? (
-                  <a
-                    href={`tel:${agent.phone}`}
-                    className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-[#b71c24]"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">call</span>
-                    {agent.phone}
-                  </a>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => user ? setPhoneRevealed(true) : openAuthModal('login')}
-                    className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-[#b71c24]"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">call</span>
-                    View Number
-                  </button>
-                )
-              )}
-            </div>
+            )}
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
@@ -192,7 +196,7 @@ const ContactModal = ({ agent, propertyId, propertyTitle, mode, onClose }: Conta
               <button
                 type="submit"
                 disabled={busy}
-                className="w-full h-12 rounded-xl bg-primary hover:bg-[#b71c24] disabled:opacity-60 text-white font-semibold flex items-center justify-center gap-2 transition-colors"
+                className="w-full h-12 rounded-xl bg-primary hover:opacity-90 disabled:opacity-60 text-white font-semibold flex items-center justify-center gap-2 transition-opacity"
               >
                 {busy && (
                   <span className="material-symbols-outlined animate-spin text-[18px]">

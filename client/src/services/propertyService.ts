@@ -85,4 +85,7 @@ export const propertyService = {
 
   create: (body: Record<string, unknown>) =>
     api.post<Property>('/properties', body),
+
+  sendEnquiry: (propertyId: string | number, payload: { name?: string; email?: string; phone?: string; message: string }) =>
+    api.post<{ success: boolean }>(`/properties/${propertyId}/enquiry`, payload),
 };

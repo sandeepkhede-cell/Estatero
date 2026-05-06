@@ -45,8 +45,8 @@ INSERT INTO agents (id, user_id, agency_name, bio, profile_image, rating, listin
    4.70, 13)
 ON CONFLICT (id) DO NOTHING;
 
-SELECT setval('users_id_seq', 10);
-SELECT setval('agents_id_seq', 10);
+SELECT setval('users_id_seq', (SELECT GREATEST(MAX(id), 1) FROM users));
+SELECT setval('agents_id_seq', (SELECT GREATEST(MAX(id), 1) FROM agents));
 
 -- ── 3. New properties (IDs 21-46) ─────────────────────────────
 
@@ -331,7 +331,7 @@ INSERT INTO properties (
 
 ON CONFLICT (id) DO NOTHING;
 
-SELECT setval('properties_id_seq', 50);
+SELECT setval('properties_id_seq', (SELECT GREATEST(MAX(id), 1) FROM properties));
 
 -- ── 4. Property images for new properties ─────────────────────
 -- Rotating through the 8 image URLs already in the DB
