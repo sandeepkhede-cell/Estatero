@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useAuthModal } from '../../context/AuthModalContext';
 import { userService, UserProfile } from '../../services/userService';
 import { inquiryService, Inquiry } from '../../services/inquiryService';
+import { propertyService } from '../../services/propertyService';
 import { Property } from '../../types/property';
 import PropertyCard from '../../components/ui/PropertyCard';
 import { useFavourites } from '../../hooks/useFavourites';
@@ -11,7 +12,25 @@ import { useSavedProperties } from '../../hooks/useSavedProperties';
 
 type Tab = 'listings' | 'saved' | 'enquiries';
 
+interface EditForm {
+  price: string;
+  description: string;
+  status: string;
+  availability: string;
+  furnishing: string;
+}
+
+const LISTING_TO_STATUS: Record<string, string> = {
+  'For Sale': 'for_sale',
+  'For Rent': 'for_rent',
+  'PG':       'pg',
+  'sale':     'for_sale',
+  'rent':     'for_rent',
+  'pg':       'pg',
+};
+
 const inputCls = 'w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent';
+const selectCls = inputCls + ' bg-white';
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -40,12 +59,22 @@ const ProfilePage = () => {
   const [loadingL,   setLoadingL]   = useState(true);
   const [loadingI,   setLoadingI]   = useState(true);
 
-  // Edit mode
+  // Profile edit
   const [editing,   setEditing]   = useState(false);
   const [editName,  setEditName]  = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [saving,    setSaving]    = useState(false);
   const [saveErr,   setSaveErr]   = useState('');
+
+  // Listing delete
+  const [confirmDeleteId, setConfirmDeleteId] = useState<Property['id'] | null>(null);
+  const [deletingId,      setDeletingId]      = useState<Property['id'] | null>(null);
+
+  // Listing edit modal
+  const [editingProperty, setEditingProperty] = useState<Property | null>(null);
+  const [editForm,        setEditForm]        = useState<EditForm>({ price: '', description: '', status: 'for_sale', availability: '', furnishing: '' });
+  const [editSaving,      setEditSaving]      = useState(false);
+  const [editErr,         setEditErr]         = useState('');
 
   useEffect(() => {
     if (!user) { open('login'); return; }
@@ -86,6 +115,54 @@ const ProfilePage = () => {
       setInquiries((prev) => prev.map((q) => q.id === inquiry.id ? { ...q, is_read: true } : q));
       setUnread((n) => Math.max(0, n - 1));
     } catch { /* silent */ }
+  };
+
+  const handleDelete = async (id: Property['id']) => {
+    setDeletingId(id);
+    try {
+      await propertyService.delete(id);
+      setListings((prev) => prev.filter((p) => p.id !== id));
+      setConfirmDeleteId(null);
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const openEdit = (property: Property) => {
+    setEditForm({
+      price:        String(property.price),
+      description:  property.description ?? '',
+      status:       LISTING_TO_STATUS[property.listingType ?? ''] ?? 'for_sale',
+      availability: property.availability ?? '',
+      furnishing:   property.furnishing   ?? '',
+    });
+    setEditErr('');
+    setEditingProperty(property);
+  };
+
+  const handleEditSave = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!editingProperty) return;
+    const price = Number(editForm.price);
+    if (!price || price <= 0) { setEditErr('Enter a valid price.'); return; }
+    setEditSaving(true); setEditErr('');
+    try {
+      const updated = await propertyService.update(editingProperty.id, {
+        price,
+        description:  editForm.description || undefined,
+        status:       editForm.status       || undefined,
+        availability: editForm.availability || undefined,
+        furnishing:   editForm.furnishing   || undefined,
+      });
+      setListings((prev) => prev.map((p) => p.id === editingProperty.id ? updated : p));
+      setEditingProperty(null);
+    } catch (err) {
+      setEditErr((err as Error).message);
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   return (
@@ -201,7 +278,49 @@ const ProfilePage = () => {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {listings.map((p) => (
-                <PropertyCard key={p.id} property={p} onCardClick={(id) => navigate(`/property/${id}`)} onFavourite={toggle} />
+                <div key={p.id} className="flex flex-col">
+                  <PropertyCard property={p} onCardClick={(id) => navigate(`/property/${id}`)} onFavourite={toggle} />
+
+                  {/* Action bar */}
+                  <div className="flex gap-2 mt-2 px-1">
+                    <button
+                      onClick={() => openEdit(p)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-outline-variant text-sm font-semibold text-on-surface-variant hover:border-primary hover:text-primary transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">edit</span>
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeleteId(confirmDeleteId === p.id ? null : p.id)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-outline-variant text-sm font-semibold text-on-surface-variant hover:border-red-400 hover:text-red-500 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">delete</span>
+                      Delete
+                    </button>
+                  </div>
+
+                  {/* Inline delete confirmation */}
+                  {confirmDeleteId === p.id && (
+                    <div className="mt-2 p-3 rounded-lg bg-red-50 border border-red-100">
+                      <p className="text-sm font-semibold text-red-700 mb-2">Delete this listing permanently?</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleDelete(p.id)}
+                          disabled={deletingId === p.id}
+                          className="flex-1 bg-red-500 text-white py-1.5 rounded-lg text-sm font-semibold disabled:opacity-50"
+                        >
+                          {deletingId === p.id ? 'Deleting…' : 'Yes, Delete'}
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(null)}
+                          className="flex-1 border border-outline-variant py-1.5 rounded-lg text-sm font-semibold text-on-surface-variant hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           )
@@ -253,7 +372,6 @@ const ProfilePage = () => {
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0">
-                      {/* Avatar */}
                       <div className="w-10 h-10 rounded-full bg-primary/10 text-primary font-bold text-sm flex items-center justify-center flex-shrink-0">
                         {q.sender_name
                           ? q.sender_name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
@@ -295,7 +413,6 @@ const ProfilePage = () => {
                     </span>
                   </div>
 
-                  {/* Property reference */}
                   {q.property_title && (
                     <button
                       onClick={(e) => { e.stopPropagation(); navigate(`/property/${q.property_id}`); }}
@@ -307,12 +424,10 @@ const ProfilePage = () => {
                     </button>
                   )}
 
-                  {/* Message */}
                   <p className="mt-3 text-sm text-on-surface leading-relaxed line-clamp-3">
                     {q.message}
                   </p>
 
-                  {/* Reply action */}
                   {q.sender_email && (
                     <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-3">
                       <a
@@ -342,6 +457,103 @@ const ProfilePage = () => {
         )}
 
       </div>
+
+      {/* ── Edit listing modal ── */}
+      {editingProperty && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setEditingProperty(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <h2 className="text-base font-bold text-on-surface">Edit Listing</h2>
+              <button onClick={() => setEditingProperty(null)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors">
+                <span className="material-symbols-outlined text-[20px] text-on-surface-variant">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSave} className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1">Price (₹)</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={editForm.price}
+                  onChange={(e) => setEditForm((f) => ({ ...f, price: e.target.value }))}
+                  className={inputCls}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1">Listing Type</label>
+                <select
+                  value={editForm.status}
+                  onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value }))}
+                  className={selectCls}
+                >
+                  <option value="for_sale">For Sale</option>
+                  <option value="for_rent">For Rent</option>
+                  <option value="pg">PG</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1">Availability</label>
+                <select
+                  value={editForm.availability}
+                  onChange={(e) => setEditForm((f) => ({ ...f, availability: e.target.value }))}
+                  className={selectCls}
+                >
+                  <option value="">— Not specified —</option>
+                  <option value="ready-to-move">Ready to Move</option>
+                  <option value="under-construction">Under Construction</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1">Furnishing</label>
+                <select
+                  value={editForm.furnishing}
+                  onChange={(e) => setEditForm((f) => ({ ...f, furnishing: e.target.value }))}
+                  className={selectCls}
+                >
+                  <option value="">— Not specified —</option>
+                  <option value="unfurnished">Unfurnished</option>
+                  <option value="semi-furnished">Semi-furnished</option>
+                  <option value="fully-furnished">Fully Furnished</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1">Description</label>
+                <textarea
+                  rows={3}
+                  value={editForm.description}
+                  onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
+                  className={inputCls + ' resize-none'}
+                />
+              </div>
+
+              {editErr && <p className="text-sm text-red-600">{editErr}</p>}
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="submit"
+                  disabled={editSaving}
+                  className="flex-1 bg-primary text-white py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50"
+                >
+                  {editSaving ? 'Saving…' : 'Save Changes'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingProperty(null)}
+                  className="flex-1 border border-outline-variant py-2.5 rounded-xl text-sm font-semibold text-on-surface-variant hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </main>
   );
 };

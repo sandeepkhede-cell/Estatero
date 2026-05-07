@@ -98,8 +98,9 @@ export async function updateProperty(req: AuthRequest, res: Response, next: Next
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid property ID' }); return; }
 
-    const existing = await propertyModel.findPropertyById(id);
-    if (!existing) { res.status(404).json({ error: 'Property not found' }); return; }
+    const ownerUserId = await propertyModel.findPropertyOwnerId(id);
+    if (ownerUserId === null) { res.status(404).json({ error: 'Property not found' }); return; }
+    if (ownerUserId !== req.user!.userId) { res.status(403).json({ error: 'Forbidden' }); return; }
 
     const property = await propertyModel.updateProperty(id, req.body as propertyModel.UpdatePropertyInput);
     res.json(property);
@@ -113,9 +114,11 @@ export async function deleteProperty(req: AuthRequest, res: Response, next: Next
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid property ID' }); return; }
 
-    const deleted = await propertyModel.deleteProperty(id);
-    if (!deleted) { res.status(404).json({ error: 'Property not found' }); return; }
+    const ownerUserId = await propertyModel.findPropertyOwnerId(id);
+    if (ownerUserId === null) { res.status(404).json({ error: 'Property not found' }); return; }
+    if (ownerUserId !== req.user!.userId) { res.status(403).json({ error: 'Forbidden' }); return; }
 
+    await propertyModel.deleteProperty(id);
     res.status(204).send();
   } catch (err) {
     next(err);

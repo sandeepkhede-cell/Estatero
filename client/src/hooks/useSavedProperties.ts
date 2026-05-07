@@ -1,44 +1,12 @@
-import { useState, useEffect } from 'react';
-import { Property } from '../types/property';
-import { propertyService } from '../services/propertyService';
-import { useFavourites } from './useFavourites';
+import { useFavouritesContext } from '../context/FavouritesContext';
 
 export const useSavedProperties = () => {
-  const { favourites, toggle, isFavourited } = useFavourites();
-  const [properties, setProperties]          = useState<Property[]>([]);
-  const [loading, setLoading]                = useState(false);
-  const [error, setError]                    = useState<string | null>(null);
-
-  useEffect(() => {
-    if (favourites.length === 0) {
-      setProperties([]);
-      return;
-    }
-
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-
-    Promise.all(favourites.map((id) => propertyService.getById(id)))
-      .then((results) => {
-        if (!cancelled)
-          setProperties(results.filter((p): p is Property => p !== null));
-      })
-      .catch(() => {
-        if (!cancelled) setError('Failed to load saved properties.');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => { cancelled = true; };
-  }, [JSON.stringify(favourites)]); // eslint-disable-line react-hooks/exhaustive-deps
-
+  const { savedProperties, loading, toggle, isFavourited } = useFavouritesContext();
   return {
-    properties: properties.map((p) => ({ ...p, isFavourited: isFavourited(p.id) })),
+    properties: savedProperties.map((p) => ({ ...p, isFavourited: isFavourited(p.id) })),
     loading,
-    error,
+    error:      null as string | null,
     toggle,
-    count: favourites.length,
+    count:      savedProperties.length,
   };
 };

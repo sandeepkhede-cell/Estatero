@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { AuthModalProvider } from './context/AuthModalContext';
+import { FavouritesProvider } from './context/FavouritesContext';
 import AuthModal from './components/ui/AuthModal';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
@@ -27,6 +28,7 @@ const MainLayout = () => (
 const App = () => (
   <BrowserRouter>
     <AuthProvider>
+      <FavouritesProvider>
       <AuthModalProvider>
         <AuthModal />
         <Routes>
@@ -43,6 +45,7 @@ const App = () => (
           </Route>
         </Routes>
       </AuthModalProvider>
+      </FavouritesProvider>
     </AuthProvider>
   </BrowserRouter>
 );

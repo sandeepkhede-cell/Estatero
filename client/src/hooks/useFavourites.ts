@@ -1,29 +1,10 @@
-import { useState, useEffect } from 'react';
-
-const STORAGE_KEY = 'estatero_favourites';
-
-const load = (): (string | number)[] => {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]');
-  } catch {
-    return [];
-  }
-};
+import { useFavouritesContext } from '../context/FavouritesContext';
 
 export const useFavourites = () => {
-  const [favourites, setFavourites] = useState<(string | number)[]>(load);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(favourites));
-  }, [favourites]);
-
-  const toggle = (id: string | number) => {
-    setFavourites((prev) =>
-      prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]
-    );
+  const { ids, toggle, isFavourited } = useFavouritesContext();
+  return {
+    favourites:   [...ids] as (string | number)[],
+    toggle,
+    isFavourited,
   };
-
-  const isFavourited = (id: string | number) => favourites.includes(id);
-
-  return { favourites, toggle, isFavourited };
 };

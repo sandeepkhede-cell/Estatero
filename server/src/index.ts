@@ -12,6 +12,7 @@ import authRoutes      from './routes/auth';
 import userRoutes      from './routes/users';
 import uploadRoutes    from './routes/upload';
 import inquiryRoutes   from './routes/inquiries';
+import favouriteRoutes from './routes/favourites';
 import { notFound, errorHandler } from './middleware/errorHandler';
 
 dotenv.config();
@@ -42,6 +43,7 @@ app.use('/api/search',     searchRoutes);
 app.use('/api/agents',     agentRoutes);
 app.use('/api/users',      userRoutes);
 app.use('/api/inquiries',  inquiryRoutes);
+app.use('/api/favourites', favouriteRoutes);
 
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));

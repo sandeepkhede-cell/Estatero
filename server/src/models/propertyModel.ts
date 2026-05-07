@@ -326,6 +326,41 @@ export async function deleteProperty(id: number): Promise<boolean> {
   return (rowCount ?? 0) > 0;
 }
 
+export async function findPropertyOwnerId(propertyId: number): Promise<number | null> {
+  const { rows } = await pool.query<{ user_id: number }>(
+    `SELECT ag.user_id FROM properties p
+     JOIN agents ag ON ag.id = p.agent_id
+     WHERE p.id = $1`,
+    [propertyId],
+  );
+  return rows[0]?.user_id ?? null;
+}
+
+export async function findFavouriteProperties(userId: number): Promise<PropertyDTO[]> {
+  const { rows } = await pool.query<PropertyRow>(
+    `${BASE_SELECT}
+     JOIN favourites fav ON fav.property_id = p.id AND fav.user_id = $1
+     GROUP BY p.id, u.name, u.phone, ag.bio, ag.profile_image
+     ORDER BY MAX(fav.created_at) DESC`,
+    [userId],
+  );
+  return rows.map(toDTO);
+}
+
+export async function addFavourite(userId: number, propertyId: number): Promise<void> {
+  await pool.query(
+    `INSERT INTO favourites (user_id, property_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+    [userId, propertyId],
+  );
+}
+
+export async function removeFavourite(userId: number, propertyId: number): Promise<void> {
+  await pool.query(
+    `DELETE FROM favourites WHERE user_id = $1 AND property_id = $2`,
+    [userId, propertyId],
+  );
+}
+
 export async function findPropertiesByAgentUserId(userId: number): Promise<PropertyDTO[]> {
   const { rows } = await pool.query<PropertyRow>(
     `${BASE_SELECT}
