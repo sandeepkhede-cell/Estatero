@@ -13,11 +13,12 @@ import { useSavedProperties } from '../../hooks/useSavedProperties';
 type Tab = 'listings' | 'saved' | 'enquiries';
 
 interface EditForm {
-  price: string;
-  description: string;
-  status: string;
-  availability: string;
-  furnishing: string;
+  price:         string;
+  description:   string;
+  status:        string;
+  listingStatus: string;
+  availability:  string;
+  furnishing:    string;
 }
 
 const LISTING_TO_STATUS: Record<string, string> = {
@@ -27,6 +28,12 @@ const LISTING_TO_STATUS: Record<string, string> = {
   'sale':     'for_sale',
   'rent':     'for_rent',
   'pg':       'pg',
+};
+
+const LISTING_STATUS_META: Record<string, { label: string; icon: string; chip: string }> = {
+  sold:   { label: 'Sold',   icon: 'sell',         chip: 'bg-red-100 text-red-700' },
+  rented: { label: 'Rented', icon: 'key',          chip: 'bg-orange-100 text-orange-700' },
+  paused: { label: 'Paused', icon: 'pause_circle',  chip: 'bg-gray-100 text-gray-600' },
 };
 
 const inputCls = 'w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent';
@@ -132,11 +139,12 @@ const ProfilePage = () => {
 
   const openEdit = (property: Property) => {
     setEditForm({
-      price:        String(property.price),
-      description:  property.description ?? '',
-      status:       LISTING_TO_STATUS[property.listingType ?? ''] ?? 'for_sale',
-      availability: property.availability ?? '',
-      furnishing:   property.furnishing   ?? '',
+      price:         String(property.price),
+      description:   property.description ?? '',
+      status:        LISTING_TO_STATUS[property.listingType ?? ''] ?? 'for_sale',
+      listingStatus: property.listingStatus ?? 'active',
+      availability:  property.availability ?? '',
+      furnishing:    property.furnishing   ?? '',
     });
     setEditErr('');
     setEditingProperty(property);
@@ -151,10 +159,11 @@ const ProfilePage = () => {
     try {
       const updated = await propertyService.update(editingProperty.id, {
         price,
-        description:  editForm.description || undefined,
-        status:       editForm.status       || undefined,
-        availability: editForm.availability || undefined,
-        furnishing:   editForm.furnishing   || undefined,
+        description:    editForm.description    || undefined,
+        status:         editForm.status         || undefined,
+        listing_status: editForm.listingStatus  || undefined,
+        availability:   editForm.availability   || undefined,
+        furnishing:     editForm.furnishing      || undefined,
       });
       setListings((prev) => prev.map((p) => p.id === editingProperty.id ? updated : p));
       setEditingProperty(null);
@@ -280,6 +289,19 @@ const ProfilePage = () => {
               {listings.map((p) => (
                 <div key={p.id} className="flex flex-col">
                   <PropertyCard property={p} onCardClick={(id) => navigate(`/property/${id}`)} onFavourite={toggle} />
+
+                  {/* Lifecycle status badge */}
+                  {p.listingStatus && p.listingStatus !== 'active' && (() => {
+                    const meta = LISTING_STATUS_META[p.listingStatus!];
+                    return meta ? (
+                      <div className="flex items-center gap-1.5 mt-2 px-1">
+                        <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full ${meta.chip}`}>
+                          <span className="material-symbols-outlined text-[12px]">{meta.icon}</span>
+                          {meta.label}
+                        </span>
+                      </div>
+                    ) : null;
+                  })()}
 
                   {/* Action bar */}
                   <div className="flex gap-2 mt-2 px-1">
@@ -492,6 +514,22 @@ const ProfilePage = () => {
                   <option value="for_sale">For Sale</option>
                   <option value="for_rent">For Rent</option>
                   <option value="pg">PG</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1">Listing Status</label>
+                <select
+                  value={editForm.listingStatus}
+                  onChange={(e) => setEditForm((f) => ({ ...f, listingStatus: e.target.value }))}
+                  className={selectCls}
+                >
+                  <option value="active">Active — visible to buyers</option>
+                  {(editForm.status === 'for_rent' || editForm.status === 'pg')
+                    ? <option value="rented">Rented — hide from listings</option>
+                    : <option value="sold">Sold — hide from listings</option>
+                  }
+                  <option value="paused">Paused — temporarily hidden</option>
                 </select>
               </div>
 

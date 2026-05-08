@@ -87,6 +87,8 @@ CREATE TABLE IF NOT EXISTS properties (
                                CHECK (badge_variant IN ('primary','secondary')),
   is_verified    BOOLEAN       NOT NULL DEFAULT FALSE,
   is_featured    BOOLEAN       NOT NULL DEFAULT FALSE,
+  listing_status VARCHAR(20)   NOT NULL DEFAULT 'active'
+                               CHECK (listing_status IN ('active','sold','rented','paused')),
 
   agent_id       INTEGER       REFERENCES agents(id) ON DELETE SET NULL,
   created_at     TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
@@ -187,6 +189,7 @@ CREATE INDEX IF NOT EXISTS idx_properties_agent        ON properties(agent_id);
 CREATE INDEX IF NOT EXISTS idx_properties_furnishing  ON properties(furnishing);
 CREATE INDEX IF NOT EXISTS idx_properties_availability ON properties(availability);
 CREATE INDEX IF NOT EXISTS idx_properties_rera         ON properties(rera_registered) WHERE rera_registered = TRUE;
+CREATE INDEX IF NOT EXISTS idx_properties_listing_status ON properties(listing_status);
 CREATE INDEX IF NOT EXISTS idx_property_images_prop    ON property_images(property_id);
 CREATE INDEX IF NOT EXISTS idx_nearby_places_prop     ON nearby_places(property_id);
 CREATE INDEX IF NOT EXISTS idx_favourites_user        ON favourites(user_id);

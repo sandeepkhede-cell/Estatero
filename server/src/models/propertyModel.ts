@@ -27,6 +27,7 @@ function toDTO(row: PropertyRow): PropertyDTO {
     listingType:     row.status === 'for_sale' ? 'For Sale'
                    : row.status === 'for_rent' ? 'For Rent'
                    : 'PG',
+    listingStatus:   row.listing_status,
     area:            row.area_sqft ? `${row.area_sqft} sqft` : undefined,
     floor:           row.floor != null ? `Floor ${row.floor}/${row.total_floors ?? '?'}` : undefined,
     facing:          row.facing        ?? undefined,
@@ -87,7 +88,7 @@ export async function findProperties(filters: PropertyFilters): Promise<Property
   const limit = filters.limit ?? PAGE_SIZE;
   const offset = (page - 1) * limit;
 
-  const conditions: string[] = [];
+  const conditions: string[] = [`p.listing_status = 'active'`];
   const params: unknown[] = [];
   let i = 1;
 
@@ -204,7 +205,7 @@ export async function findPropertyById(id: number): Promise<PropertyDTO | null> 
 export async function findFeaturedProperties(): Promise<PropertyDTO[]> {
   const { rows } = await pool.query<PropertyRow>(
     `${BASE_SELECT}
-     WHERE p.is_featured = TRUE
+     WHERE p.is_featured = TRUE AND p.listing_status = 'active'
      GROUP BY p.id, u.name, u.phone, ag.bio, ag.profile_image
      ORDER BY p.created_at DESC
      LIMIT 8`
@@ -215,7 +216,8 @@ export async function findFeaturedProperties(): Promise<PropertyDTO[]> {
 export async function searchProperties(q: string): Promise<PropertyDTO[]> {
   const { rows } = await pool.query<PropertyRow>(
     `${BASE_SELECT}
-     WHERE to_tsvector('english', p.title || ' ' || p.location || ' ' || p.city)
+     WHERE p.listing_status = 'active'
+       AND to_tsvector('english', p.title || ' ' || p.location || ' ' || p.city)
            @@ plainto_tsquery('english', $1)
      GROUP BY p.id, u.name, u.phone, ag.bio, ag.profile_image
      ORDER BY p.created_at DESC
@@ -340,6 +342,7 @@ export async function findFavouriteProperties(userId: number): Promise<PropertyD
   const { rows } = await pool.query<PropertyRow>(
     `${BASE_SELECT}
      JOIN favourites fav ON fav.property_id = p.id AND fav.user_id = $1
+     WHERE p.listing_status = 'active'
      GROUP BY p.id, u.name, u.phone, ag.bio, ag.profile_image
      ORDER BY MAX(fav.created_at) DESC`,
     [userId],
@@ -375,7 +378,7 @@ export async function findPropertiesByAgentUserId(userId: number): Promise<Prope
 export async function findPropertiesByAgentId(agentId: number): Promise<PropertyDTO[]> {
   const { rows } = await pool.query<PropertyRow>(
     `${BASE_SELECT}
-     WHERE p.agent_id = $1
+     WHERE p.agent_id = $1 AND p.listing_status = 'active'
      GROUP BY p.id, u.name, u.phone, ag.bio, ag.profile_image
      ORDER BY p.created_at DESC`,
     [agentId],

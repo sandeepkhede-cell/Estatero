@@ -78,6 +78,7 @@ export interface Property {
 
   // Status / flags
   status?:         string;
+  listingStatus?:  'active' | 'sold' | 'rented' | 'paused';
   furnishing?:     FurnishingType;
   availability?:   AvailabilityType;
   isVerified?:     boolean;

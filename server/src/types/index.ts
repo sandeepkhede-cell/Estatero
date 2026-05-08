@@ -27,9 +27,10 @@ export interface PropertyRow {
   rera_number:     string | null;
   badge:           string | null;
   badge_variant: string | null;
-  is_verified: boolean;
-  is_featured: boolean;
-  agent_id: number | null;
+  is_verified:    boolean;
+  is_featured:    boolean;
+  listing_status: string;
+  agent_id:       number | null;
   created_at: Date;
   updated_at: Date;
   // joined
@@ -98,8 +99,9 @@ export interface PropertyDTO {
   badgeVariant?:   'primary' | 'secondary';
   isVerified:      boolean;
   isFavourited?:   boolean;
-  // listing kind
+  // listing kind + lifecycle
   listingType:     string;   // 'For Sale' | 'For Rent' | 'PG'
+  listingStatus:   string;   // 'active' | 'sold' | 'rented' | 'paused'
   // property detail
   area?:           string;
   floor?:          string;
