@@ -213,3 +213,43 @@ DROP TRIGGER IF EXISTS trg_properties_updated_at ON properties;
 CREATE TRIGGER trg_properties_updated_at
   BEFORE UPDATE ON properties
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ============================================================
+-- AUTO-SYNC agents.listings_count
+-- ============================================================
+CREATE OR REPLACE FUNCTION sync_agent_listings_count()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.agent_id IS NOT NULL AND NEW.listing_status = 'active' THEN
+      UPDATE agents SET listings_count = listings_count + 1 WHERE id = NEW.agent_id;
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'DELETE' THEN
+    IF OLD.agent_id IS NOT NULL AND OLD.listing_status = 'active' THEN
+      UPDATE agents SET listings_count = GREATEST(0, listings_count - 1) WHERE id = OLD.agent_id;
+    END IF;
+    RETURN OLD;
+  END IF;
+
+  IF TG_OP = 'UPDATE' THEN
+    IF OLD.agent_id IS NOT NULL AND OLD.listing_status = 'active' THEN
+      UPDATE agents SET listings_count = GREATEST(0, listings_count - 1) WHERE id = OLD.agent_id;
+    END IF;
+    IF NEW.agent_id IS NOT NULL AND NEW.listing_status = 'active' THEN
+      UPDATE agents SET listings_count = listings_count + 1 WHERE id = NEW.agent_id;
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_sync_agent_listings_count ON properties;
+CREATE TRIGGER trg_sync_agent_listings_count
+  AFTER INSERT OR DELETE OR UPDATE OF agent_id, listing_status
+  ON properties
+  FOR EACH ROW EXECUTE FUNCTION sync_agent_listings_count();
