@@ -2,7 +2,9 @@ import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { AuthModalProvider } from './context/AuthModalContext';
 import { FavouritesProvider } from './context/FavouritesContext';
+import { CompareProvider } from './context/CompareContext';
 import AuthModal from './components/ui/AuthModal';
+import CompareBar from './components/ui/CompareBar';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import MobileNav from './components/layout/MobileNav';
@@ -15,6 +17,7 @@ import PostPropertyPage from './pages/PostPropertyPage';
 import ProfilePage from './pages/ProfilePage';
 import AgentProfilePage from './pages/AgentProfilePage';
 import AgentsPage from './pages/AgentsPage';
+import ComparePage from './pages/ComparePage';
 
 const MainLayout = () => (
   <div className="flex flex-col min-h-screen">
@@ -22,6 +25,7 @@ const MainLayout = () => (
     <Outlet />
     <Footer />
     <MobileNav />
+    <CompareBar />
   </div>
 );
 
@@ -29,6 +33,7 @@ const App = () => (
   <BrowserRouter>
     <AuthProvider>
       <FavouritesProvider>
+      <CompareProvider>
       <AuthModalProvider>
         <AuthModal />
         <Routes>
@@ -42,9 +47,11 @@ const App = () => (
             <Route path="/profile"        element={<ProfilePage />} />
             <Route path="/agents"          element={<AgentsPage />} />
             <Route path="/agent/:id"      element={<AgentProfilePage />} />
+            <Route path="/compare"        element={<ComparePage />} />
           </Route>
         </Routes>
       </AuthModalProvider>
+      </CompareProvider>
       </FavouritesProvider>
     </AuthProvider>
   </BrowserRouter>

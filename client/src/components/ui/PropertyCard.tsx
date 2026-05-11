@@ -3,6 +3,7 @@ import { formatINR } from '../../utils/formatINR';
 import FavouriteButton from './FavouriteButton';
 import VerifiedBadge from './VerifiedBadge';
 import PropertySpecsRow from './PropertySpecsRow';
+import { useCompare } from '../../context/CompareContext';
 
 interface PropertyCardProps {
   property: Property;
@@ -12,6 +13,9 @@ interface PropertyCardProps {
 
 const PropertyCard = ({ property, onCardClick, onFavourite }: PropertyCardProps) => {
   const { id, price, emi, title, location, image, badge, isVerified, isFavourited, area, status, floor } = property;
+  const { toggle, isSelected, selected } = useCompare();
+  const inCompare    = isSelected(id);
+  const limitReached = !inCompare && selected.length >= 3;
 
   const specs = [
     ...(area   ? [{ label: 'Area',   value: area   }] : []),
@@ -61,12 +65,31 @@ const PropertyCard = ({ property, onCardClick, onFavourite }: PropertyCardProps)
 
         {specs.length > 0 && <PropertySpecsRow specs={specs} />}
 
-        <button
-          onClick={(e) => { e.stopPropagation(); onCardClick?.(id); }}
-          className="w-full bg-primary-container text-on-primary-container py-3 rounded-lg font-label-bold text-body-md hover:opacity-90 transition-all mt-md"
-        >
-          View Details
-        </button>
+        <div className="flex gap-2 mt-md">
+          <button
+            onClick={(e) => { e.stopPropagation(); onCardClick?.(id); }}
+            className="flex-1 bg-primary-container text-on-primary-container py-3 rounded-lg font-label-bold text-body-md hover:opacity-90 transition-all"
+          >
+            View Details
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); toggle(property); }}
+            disabled={limitReached}
+            title={limitReached ? 'Max 3 properties' : inCompare ? 'Remove from compare' : 'Add to compare'}
+            className={[
+              'flex items-center justify-center w-10 h-10 rounded-lg border transition-colors flex-shrink-0',
+              inCompare
+                ? 'bg-primary text-white border-primary'
+                : limitReached
+                  ? 'border-gray-100 text-gray-300 cursor-not-allowed'
+                  : 'border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary',
+            ].join(' ')}
+          >
+            <span className="material-symbols-outlined text-[18px]">
+              {inCompare ? 'check_box' : 'compare'}
+            </span>
+          </button>
+        </div>
       </div>
     </div>
   );
