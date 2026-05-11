@@ -14,6 +14,7 @@ import BottomActionBar from '../../components/detail/BottomActionBar';
 import ContactModal from '../../components/detail/ContactModal';
 import Breadcrumb from '../../components/ui/Breadcrumb';
 import RecommendedSection from '../../components/home/RecommendedSection';
+import EmiCalculator from '../../components/detail/EmiCalculator';
 import { usePropertyDetail } from '../../hooks/usePropertyDetail';
 import { useSimilarProperties } from '../../hooks/useSimilarProperties';
 
@@ -127,6 +128,11 @@ const DetailPage = () => {
                 <AgentCard agent={property.agent} onCall={handleCall} />
               </div>
             )}
+
+            {/* EMI calculator — mobile only */}
+            <div className="lg:hidden mt-6">
+              <EmiCalculator propertyPrice={property.price} />
+            </div>
           </div>
 
           {/* ── Right sidebar ── */}
@@ -175,6 +181,8 @@ const DetailPage = () => {
               {property.agent && (
                 <AgentCard agent={property.agent} onCall={handleCall} />
               )}
+
+              <EmiCalculator propertyPrice={property.price} />
             </div>
           </aside>
 
