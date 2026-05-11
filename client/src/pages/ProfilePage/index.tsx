@@ -77,6 +77,12 @@ const ProfilePage = () => {
   const [confirmDeleteId, setConfirmDeleteId] = useState<Property['id'] | null>(null);
   const [deletingId,      setDeletingId]      = useState<Property['id'] | null>(null);
 
+  // Inquiry reply
+  const [replyingToId, setReplyingToId] = useState<number | null>(null);
+  const [replyDraft,   setReplyDraft]   = useState('');
+  const [replySending, setReplySending] = useState(false);
+  const [replyErr,     setReplyErr]     = useState('');
+
   // Listing edit modal
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [editForm,        setEditForm]        = useState<EditForm>({ price: '', description: '', status: 'for_sale', availability: '', furnishing: '' });
@@ -122,6 +128,31 @@ const ProfilePage = () => {
       setInquiries((prev) => prev.map((q) => q.id === inquiry.id ? { ...q, is_read: true } : q));
       setUnread((n) => Math.max(0, n - 1));
     } catch { /* silent */ }
+  };
+
+  const openReply = (id: number) => {
+    setReplyingToId(id);
+    setReplyDraft('');
+    setReplyErr('');
+  };
+
+  const handleReply = async (inquiry: Inquiry) => {
+    if (!replyDraft.trim()) { setReplyErr('Reply cannot be empty.'); return; }
+    setReplySending(true); setReplyErr('');
+    try {
+      const { repliedAt } = await inquiryService.reply(inquiry.id, replyDraft.trim());
+      setInquiries((prev) => prev.map((q) =>
+        q.id === inquiry.id
+          ? { ...q, reply_message: replyDraft.trim(), replied_at: repliedAt, is_read: true }
+          : q,
+      ));
+      if (!inquiry.is_read) setUnread((n) => Math.max(0, n - 1));
+      setReplyingToId(null);
+    } catch (err) {
+      setReplyErr((err as Error).message);
+    } finally {
+      setReplySending(false);
+    }
   };
 
   const handleDelete = async (id: Property['id']) => {
@@ -450,28 +481,68 @@ const ProfilePage = () => {
                     {q.message}
                   </p>
 
-                  {q.sender_email && (
-                    <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-3">
-                      <a
-                        href={`mailto:${q.sender_email}?subject=Re: ${encodeURIComponent(q.property_title ?? 'Your Enquiry')}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
-                      >
-                        <span className="material-symbols-outlined text-[14px]">reply</span>
-                        Reply via Email
-                      </a>
-                      {q.sender_phone && (
-                        <a
-                          href={`tel:${q.sender_phone}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="flex items-center gap-1.5 text-xs font-semibold text-on-surface-variant hover:text-primary"
+                  {/* Reply section */}
+                  <div className="mt-3 pt-3 border-t border-gray-100" onClick={(e) => e.stopPropagation()}>
+                    {q.reply_message ? (
+                      <div className="bg-primary/5 border border-primary/15 rounded-xl p-3">
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <span className="material-symbols-outlined text-[14px] text-primary">reply</span>
+                          <span className="text-xs font-bold text-primary">Your reply</span>
+                          {q.replied_at && (
+                            <span className="text-xs text-on-surface-variant ml-auto">{timeAgo(q.replied_at)}</span>
+                          )}
+                        </div>
+                        <p className="text-sm text-on-surface leading-relaxed">{q.reply_message}</p>
+                      </div>
+                    ) : replyingToId === q.id ? (
+                      <div className="space-y-2">
+                        <textarea
+                          autoFocus
+                          rows={3}
+                          value={replyDraft}
+                          onChange={(e) => setReplyDraft(e.target.value)}
+                          placeholder="Type your reply…"
+                          className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                        />
+                        {replyErr && <p className="text-xs text-red-600">{replyErr}</p>}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleReply(q)}
+                            disabled={replySending}
+                            className="flex items-center gap-1.5 bg-primary text-white px-4 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">send</span>
+                            {replySending ? 'Sending…' : 'Send Reply'}
+                          </button>
+                          <button
+                            onClick={() => setReplyingToId(null)}
+                            className="text-xs font-semibold text-on-surface-variant px-3 hover:text-on-surface"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <button
+                          onClick={() => openReply(q.id)}
+                          className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
                         >
-                          <span className="material-symbols-outlined text-[14px]">call</span>
-                          Call Back
-                        </a>
-                      )}
-                    </div>
-                  )}
+                          <span className="material-symbols-outlined text-[14px]">reply</span>
+                          Reply
+                        </button>
+                        {q.sender_phone && (
+                          <a
+                            href={`tel:${q.sender_phone}`}
+                            className="flex items-center gap-1.5 text-xs font-semibold text-on-surface-variant hover:text-primary"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">call</span>
+                            Call Back
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

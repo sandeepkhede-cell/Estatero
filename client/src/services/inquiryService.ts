@@ -9,6 +9,8 @@ export interface Inquiry {
   sender_phone:      string | null;
   message:           string;
   is_read:           boolean;
+  reply_message:     string | null;
+  replied_at:        string | null;
   created_at:        string;
   property_title:    string | null;
   property_location: string | null;
@@ -24,4 +26,7 @@ export const inquiryService = {
 
   getUnreadCount: () =>
     api.get<{ count: number }>('/inquiries/unread'),
+
+  reply: (id: number, message: string) =>
+    api.post<{ success: boolean; repliedAt: string }>(`/inquiries/${id}/reply`, { message }),
 };

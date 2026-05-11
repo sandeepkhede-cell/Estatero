@@ -156,9 +156,11 @@ CREATE TABLE IF NOT EXISTS inquiries (
   sender_name  VARCHAR(255),
   sender_email VARCHAR(255),
   sender_phone VARCHAR(30),
-  message      TEXT         NOT NULL,
-  is_read      BOOLEAN      NOT NULL DEFAULT FALSE,
-  created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+  message        TEXT         NOT NULL,
+  is_read        BOOLEAN      NOT NULL DEFAULT FALSE,
+  reply_message  TEXT,
+  replied_at     TIMESTAMPTZ,
+  created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_inquiries_agent    ON inquiries(agent_id);

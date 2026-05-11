@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { pool } from '../db/connection';
 import { AuthRequest } from '../middleware/auth';
+import { sendReplyEmail } from '../utils/mailer';
 
 export async function getMyInquiries(req: AuthRequest, res: Response, next: NextFunction) {
   try {
@@ -16,6 +17,8 @@ export async function getMyInquiries(req: AuthRequest, res: Response, next: Next
          i.sender_phone,
          i.message,
          i.is_read,
+         i.reply_message,
+         i.replied_at,
          i.created_at,
          p.title   AS property_title,
          p.location AS property_location,
@@ -68,6 +71,67 @@ export async function markInquiryRead(req: AuthRequest, res: Response, next: Nex
     }
 
     res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function replyToInquiry(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const userId    = req.user!.userId;
+    const inquiryId = parseInt(req.params.id, 10);
+    if (isNaN(inquiryId)) { res.status(400).json({ error: 'Invalid inquiry ID' }); return; }
+
+    const { message } = req.body as { message?: string };
+    if (!message?.trim()) { res.status(400).json({ error: 'message is required' }); return; }
+
+    // Verify ownership and fetch data needed for the email in one query
+    const { rows } = await pool.query<{
+      sender_name:      string | null;
+      sender_email:     string | null;
+      original_message: string;
+      property_title:   string | null;
+      agent_name:       string;
+      agent_email:      string;
+    }>(
+      `SELECT
+         i.sender_name,
+         i.sender_email,
+         i.message        AS original_message,
+         p.title          AS property_title,
+         u.name           AS agent_name,
+         u.email          AS agent_email
+       FROM inquiries i
+       LEFT JOIN properties p ON p.id = i.property_id
+       LEFT JOIN agents     ag ON ag.id = COALESCE(i.agent_id, p.agent_id)
+       LEFT JOIN users      u  ON u.id  = ag.user_id
+       WHERE i.id = $1 AND ag.user_id = $2`,
+      [inquiryId, userId],
+    );
+
+    if (!rows.length) { res.status(404).json({ error: 'Inquiry not found' }); return; }
+
+    await pool.query(
+      `UPDATE inquiries
+       SET reply_message = $2, replied_at = NOW(), is_read = TRUE
+       WHERE id = $1`,
+      [inquiryId, message.trim()],
+    );
+
+    const row = rows[0];
+    if (row.sender_email) {
+      sendReplyEmail({
+        to:              row.sender_email,
+        toName:          row.sender_name,
+        agentName:       row.agent_name,
+        agentEmail:      row.agent_email,
+        propertyTitle:   row.property_title,
+        originalMessage: row.original_message,
+        replyMessage:    message.trim(),
+      }).catch((err: unknown) => console.error('[mailer]', err));
+    }
+
+    res.json({ success: true, repliedAt: new Date().toISOString() });
   } catch (err) {
     next(err);
   }
