@@ -1,14 +1,32 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useAuthModal } from '../../context/AuthModalContext';
 import { userService, UserProfile } from '../../services/userService';
 import { inquiryService, Inquiry } from '../../services/inquiryService';
 import { propertyService } from '../../services/propertyService';
+import { agentService, MyAgentProfile } from '../../services/agentService';
 import { Property } from '../../types/property';
 import PropertyCard from '../../components/ui/PropertyCard';
 import { useFavourites } from '../../hooks/useFavourites';
 import { useSavedProperties } from '../../hooks/useSavedProperties';
+
+const API_BASE = (import.meta as unknown as { env: Record<string, string> }).env.VITE_API_URL
+  ?? 'http://localhost:5000/api';
+
+async function uploadSingleFile(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append('images', file);
+  const token = localStorage.getItem('token');
+  const res = await fetch(`${API_BASE}/upload`, {
+    method: 'POST',
+    body: formData,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error('Upload failed');
+  const data = await res.json() as { urls: string[] };
+  return data.urls[0];
+}
 
 type Tab = 'listings' | 'saved' | 'enquiries';
 
@@ -85,9 +103,18 @@ const ProfilePage = () => {
 
   // Listing edit modal
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
-  const [editForm,        setEditForm]        = useState<EditForm>({ price: '', description: '', status: 'for_sale', availability: '', furnishing: '' });
+  const [editForm,        setEditForm]        = useState<EditForm>({ price: '', description: '', status: 'for_sale', listingStatus: 'active', availability: '', furnishing: '' });
   const [editSaving,      setEditSaving]      = useState(false);
   const [editErr,         setEditErr]         = useState('');
+
+  // Agent profile
+  const [agentProfile,         setAgentProfile]         = useState<MyAgentProfile | null>(null);
+  const [editingAgent,         setEditingAgent]         = useState(false);
+  const [agentForm,            setAgentForm]            = useState({ agencyName: '', bio: '', licenseNumber: '' });
+  const [agentSaving,          setAgentSaving]          = useState(false);
+  const [agentErr,             setAgentErr]             = useState('');
+  const [agentAvatarUploading, setAgentAvatarUploading] = useState(false);
+  const agentAvatarRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!user) { open('login'); return; }
@@ -101,6 +128,14 @@ const ProfilePage = () => {
       .then(({ inquiries: list, unreadCount }) => { setInquiries(list); setUnread(unreadCount); })
       .catch(() => {})
       .finally(() => setLoadingI(false));
+    agentService.getMe()
+      .then((p) => {
+        if (p) {
+          setAgentProfile(p);
+          setAgentForm({ agencyName: p.agencyName ?? '', bio: p.bio ?? '', licenseNumber: p.licenseNumber ?? '' });
+        }
+      })
+      .catch(() => {});
   }, [user]);
 
   if (!user) return null;
@@ -205,6 +240,46 @@ const ProfilePage = () => {
     }
   };
 
+  const handleAgentSave = async (e: FormEvent) => {
+    e.preventDefault();
+    setAgentSaving(true); setAgentErr('');
+    try {
+      const updated = await agentService.updateMe({
+        agencyName:    agentForm.agencyName    || null,
+        bio:           agentForm.bio           || null,
+        licenseNumber: agentForm.licenseNumber || null,
+        profileImage:  agentProfile?.profileImage ?? null,
+      });
+      setAgentProfile(updated);
+      setEditingAgent(false);
+    } catch (err) {
+      setAgentErr((err as Error).message);
+    } finally {
+      setAgentSaving(false);
+    }
+  };
+
+  const handleAgentAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAgentAvatarUploading(true);
+    try {
+      const url = await uploadSingleFile(file);
+      const updated = await agentService.updateMe({
+        agencyName:    agentProfile?.agencyName    ?? null,
+        bio:           agentProfile?.bio           ?? null,
+        licenseNumber: agentProfile?.licenseNumber ?? null,
+        profileImage:  url,
+      });
+      setAgentProfile(updated);
+    } catch (err) {
+      setAgentErr((err as Error).message);
+    } finally {
+      setAgentAvatarUploading(false);
+      if (agentAvatarRef.current) agentAvatarRef.current.value = '';
+    }
+  };
+
   return (
     <main className="flex-grow bg-surface-bright">
       <div className="max-w-[1200px] mx-auto px-6 py-8">
@@ -269,6 +344,139 @@ const ProfilePage = () => {
               + Post Property
             </button>
           </div>
+        </div>
+
+        {/* Agent Profile card */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 md:p-8 mb-8">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-base font-bold text-on-surface flex items-center gap-2">
+              <span className="material-symbols-outlined text-[20px] text-primary">real_estate_agent</span>
+              Agent Profile
+            </h2>
+            {agentProfile && !editingAgent && (
+              <button
+                onClick={() => setEditingAgent(true)}
+                className="flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
+              >
+                <span className="material-symbols-outlined text-[16px]">edit</span>
+                Edit
+              </button>
+            )}
+          </div>
+
+          {editingAgent ? (
+            <form onSubmit={handleAgentSave} className="space-y-4 max-w-lg">
+              <div>
+                <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1">Agency / Company Name</label>
+                <input
+                  value={agentForm.agencyName}
+                  onChange={(e) => setAgentForm((f) => ({ ...f, agencyName: e.target.value }))}
+                  placeholder="e.g. Sunrise Realty"
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1">RERA / License Number</label>
+                <input
+                  value={agentForm.licenseNumber}
+                  onChange={(e) => setAgentForm((f) => ({ ...f, licenseNumber: e.target.value }))}
+                  placeholder="e.g. RERA12345678"
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1">Bio</label>
+                <textarea
+                  rows={3}
+                  value={agentForm.bio}
+                  onChange={(e) => setAgentForm((f) => ({ ...f, bio: e.target.value }))}
+                  placeholder="Tell buyers a bit about yourself…"
+                  className={inputCls + ' resize-none'}
+                />
+              </div>
+              {agentErr && <p className="text-sm text-red-600">{agentErr}</p>}
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="submit"
+                  disabled={agentSaving}
+                  className="bg-primary text-white px-6 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50"
+                >
+                  {agentSaving ? 'Saving…' : 'Save Profile'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setEditingAgent(false); setAgentErr(''); }}
+                  className="text-sm font-semibold text-on-surface-variant px-4 hover:text-on-surface"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : agentProfile ? (
+            <div className="flex items-start gap-6 flex-wrap">
+              {/* Avatar */}
+              <div className="relative flex-shrink-0">
+                <div className="w-20 h-20 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center">
+                  {agentProfile.profileImage ? (
+                    <img src={agentProfile.profileImage} alt="Agent avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="material-symbols-outlined text-primary text-4xl">person</span>
+                  )}
+                </div>
+                <button
+                  onClick={() => agentAvatarRef.current?.click()}
+                  disabled={agentAvatarUploading}
+                  className="absolute bottom-0 right-0 w-6 h-6 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow-sm hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {agentAvatarUploading
+                    ? <span className="material-symbols-outlined text-[12px] animate-spin text-primary">progress_activity</span>
+                    : <span className="material-symbols-outlined text-[12px] text-on-surface-variant">photo_camera</span>
+                  }
+                </button>
+                <input ref={agentAvatarRef} type="file" accept="image/*" className="hidden" onChange={handleAgentAvatarChange} />
+              </div>
+
+              {/* Details */}
+              <div className="flex-1 min-w-0 space-y-1.5">
+                {agentProfile.agencyName && (
+                  <p className="text-sm font-bold text-on-surface">{agentProfile.agencyName}</p>
+                )}
+                {agentProfile.licenseNumber && (
+                  <p className="text-xs text-on-surface-variant flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">verified</span>
+                    {agentProfile.licenseNumber}
+                  </p>
+                )}
+                {agentProfile.bio && (
+                  <p className="text-sm text-on-surface-variant leading-relaxed mt-2">{agentProfile.bio}</p>
+                )}
+                <div className="flex items-center gap-4 mt-3">
+                  <div className="flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[16px] text-amber-500">star</span>
+                    <span className="text-sm font-bold text-on-surface">{agentProfile.rating.toFixed(1)}</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-sm text-on-surface-variant">
+                    <span className="material-symbols-outlined text-[16px]">home</span>
+                    {agentProfile.listingsCount} active {agentProfile.listingsCount === 1 ? 'listing' : 'listings'}
+                  </div>
+                </div>
+              </div>
+
+              {agentErr && <p className="text-sm text-red-600 w-full">{agentErr}</p>}
+            </div>
+          ) : (
+            <div className="flex flex-col items-start gap-4">
+              <p className="text-sm text-on-surface-variant">
+                Create an agent profile to appear in the agents directory and build buyer trust.
+              </p>
+              <button
+                onClick={() => setEditingAgent(true)}
+                className="bg-primary text-white px-6 py-2.5 rounded-xl text-sm font-semibold"
+              >
+                Set Up Agent Profile
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Tabs */}

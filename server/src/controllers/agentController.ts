@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import * as agentModel from '../models/agentModel';
 import { findPropertiesByAgentId } from '../models/propertyModel';
+import { AuthRequest } from '../middleware/auth';
 
 export async function getAllAgents(req: Request, res: Response, next: NextFunction) {
   try {
@@ -36,6 +37,31 @@ export async function getAgentProperties(req: Request, res: Response, next: Next
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid agent ID' }); return; }
     const properties = await findPropertiesByAgentId(id);
     res.json(properties);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getMyAgentProfile(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const profile = await agentModel.findAgentByUserId(req.user!.userId);
+    res.json(profile ?? null);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateMyAgentProfile(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { agencyName, bio, licenseNumber, profileImage } =
+      req.body as agentModel.UpdateAgentProfileInput;
+    const profile = await agentModel.upsertAgentProfile(req.user!.userId, {
+      agencyName:    agencyName    ?? null,
+      bio:           bio           ?? null,
+      licenseNumber: licenseNumber ?? null,
+      profileImage:  profileImage  ?? null,
+    });
+    res.json(profile);
   } catch (err) {
     next(err);
   }
