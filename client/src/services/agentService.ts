@@ -48,4 +48,10 @@ export const agentService = {
 
   updateMe: (input: UpdateAgentProfileInput) =>
     api.patch<MyAgentProfile>('/agents/me', input),
+
+  rate: (agentId: number, rating: number) =>
+    api.post<{ success: boolean; newAverage: number }>(`/agents/${agentId}/rate`, { rating }),
+
+  getMyRating: (agentId: number) =>
+    api.get<{ rating: number | null }>(`/agents/${agentId}/my-rating`),
 };

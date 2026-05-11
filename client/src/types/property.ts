@@ -87,6 +87,9 @@ export interface Property {
   isReraRegistered?: boolean;
   reraNumber?:     string;
 
+  // Engagement
+  viewCount?:      number;
+
   // Display extras
   badge?:          string;
   badgeVariant?:   'primary' | 'secondary';

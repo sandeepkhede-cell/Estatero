@@ -12,7 +12,11 @@ export async function getProperties(req: Request, res: Response, next: NextFunct
       propertyType:  req.query.propertyType  as string | string[],
       status:        req.query.status        as string,
       bhk:           req.query.bhk           as string | string[],
+      priceMin:      req.query.priceMin      ? Number(req.query.priceMin)  : undefined,
       priceRange:    req.query.priceRange    ? Number(req.query.priceRange) : undefined,
+      amenities:     req.query.amenity
+                       ? (Array.isArray(req.query.amenity) ? req.query.amenity : [req.query.amenity]) as string[]
+                       : undefined,
       furnishing:    req.query.furnishing    as string | string[],
       availability:  req.query.availability  as string,
       ageOfProperty: req.query.ageOfProperty as string,
@@ -50,6 +54,16 @@ export async function getFeaturedProperties(_req: Request, res: Response, next: 
   try {
     const properties = await propertyModel.findFeaturedProperties();
     res.json(properties);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function recordView(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!isNaN(id)) propertyModel.incrementViewCount(id).catch(() => {});
+    res.json({ success: true });
   } catch (err) {
     next(err);
   }

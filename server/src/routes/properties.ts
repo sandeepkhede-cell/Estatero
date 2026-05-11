@@ -8,6 +8,7 @@ import {
   updateProperty,
   deleteProperty,
   sendPropertyEnquiry,
+  recordView,
 } from '../controllers/propertyController';
 import { requireAuth } from '../middleware/auth';
 
@@ -20,6 +21,7 @@ router.get('/:id',   getPropertyById);
 
 router.post('/',           requireAuth, createProperty);
 router.post('/:id/enquiry', sendPropertyEnquiry);
+router.post('/:id/view',   recordView);
 router.put('/:id',         requireAuth, updateProperty);
 router.delete('/:id',      requireAuth, deleteProperty);
 

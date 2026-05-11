@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getAllAgents, getAgentById, getAgentProperties, contactAgent, getMyAgentProfile, updateMyAgentProfile } from '../controllers/agentController';
+import { getAllAgents, getAgentById, getAgentProperties, contactAgent, getMyAgentProfile, updateMyAgentProfile, rateAgent, getMyRating } from '../controllers/agentController';
 import { requireAuth } from '../middleware/auth';
 
 const router = Router();
@@ -20,5 +20,11 @@ router.get('/:id/properties', getAgentProperties);
 
 // POST /api/agents/:id/contact
 router.post('/:id/contact', contactAgent);
+
+// POST /api/agents/:id/rate       — submit / update a 1-5 star rating (auth required)
+router.post('/:id/rate',     requireAuth, rateAgent);
+
+// GET  /api/agents/:id/my-rating  — fetch current user's own rating for this agent
+router.get('/:id/my-rating', requireAuth, getMyRating);
 
 export default router;

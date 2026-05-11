@@ -36,6 +36,7 @@ function toDTO(row: PropertyRow): PropertyDTO {
     ageOfProperty:   row.age_of_property ?? undefined,
     isReraRegistered: row.rera_registered,
     reraNumber:      row.rera_number   ?? undefined,
+    viewCount:       row.view_count    ?? 0,
     meta,
     amenities:    row.amenities ?? undefined,
     nearbyPlaces: row.nearby_places ?? undefined,
@@ -110,9 +111,25 @@ export async function findProperties(filters: PropertyFilters): Promise<Property
     conditions.push(`p.status = $${i++}`);
     params.push(filters.status);
   }
+  if (filters.priceMin) {
+    conditions.push(`p.price >= $${i++}`);
+    params.push(filters.priceMin);
+  }
   if (filters.priceRange) {
     conditions.push(`p.price <= $${i++}`);
     params.push(filters.priceRange);
+  }
+  if (filters.amenities?.length) {
+    conditions.push(
+      `p.id IN (
+         SELECT pa.property_id FROM property_amenities pa
+         JOIN amenities a ON a.id = pa.amenity_id
+         WHERE a.label = ANY($${i++}::text[])
+         GROUP BY pa.property_id
+         HAVING COUNT(DISTINCT a.label) = $${i++}
+       )`
+    );
+    params.push(filters.amenities, filters.amenities.length);
   }
   if (filters.bhk) {
     const bhkList = Array.isArray(filters.bhk) ? filters.bhk : [filters.bhk];
@@ -200,6 +217,13 @@ export async function findPropertyById(id: number): Promise<PropertyDTO | null> 
     [id]
   );
   return rows[0] ? toDTO(rows[0]) : null;
+}
+
+export async function incrementViewCount(id: number): Promise<void> {
+  await pool.query(
+    `UPDATE properties SET view_count = view_count + 1 WHERE id = $1`,
+    [id]
+  );
 }
 
 export async function findFeaturedProperties(): Promise<PropertyDTO[]> {

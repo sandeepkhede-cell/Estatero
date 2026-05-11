@@ -30,6 +30,7 @@ export interface PropertyRow {
   is_verified:    boolean;
   is_featured:    boolean;
   listing_status: string;
+  view_count:     number;
   agent_id:       number | null;
   created_at: Date;
   updated_at: Date;
@@ -111,6 +112,7 @@ export interface PropertyDTO {
   ageOfProperty?:  string;
   isReraRegistered: boolean;
   reraNumber?:     string;
+  viewCount:       number;
   meta:            PropertyMeta[];
   amenities?:      Amenity[];
   nearbyPlaces?:   NearbyPlace[];
@@ -136,7 +138,9 @@ export interface PropertyFilters {
   propertyType?:  string | string[];
   status?:        string;
   bhk?:           string | string[];
+  priceMin?:      number;   // min price in rupees
   priceRange?:    number;   // max price in rupees
+  amenities?:     string[];
   furnishing?:    string | string[];
   availability?:  string;
   ageOfProperty?: string;

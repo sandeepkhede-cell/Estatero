@@ -5,11 +5,15 @@ import { Agent, Property } from '../../types/property';
 import PropertyCard from '../../components/ui/PropertyCard';
 import { useFavourites } from '../../hooks/useFavourites';
 import { formatINR } from '../../utils/formatINR';
+import { useAuth } from '../../context/AuthContext';
+import { useAuthModal } from '../../context/AuthModalContext';
 
 const AgentProfilePage = () => {
-  const { id }      = useParams();
-  const navigate    = useNavigate();
-  const { toggle }  = useFavourites();
+  const { id }       = useParams();
+  const navigate     = useNavigate();
+  const { toggle }   = useFavourites();
+  const { user }     = useAuth();
+  const { open }     = useAuthModal();
 
   const [agent,      setAgent]      = useState<Agent | null>(null);
   const [listings,   setListings]   = useState<Property[]>([]);
@@ -17,18 +21,44 @@ const AgentProfilePage = () => {
   const [loadingL,   setLoadingL]   = useState(true);
   const [showPhone,  setShowPhone]  = useState(false);
 
+  // Rating
+  const [myRating,     setMyRating]     = useState<number | null>(null);
+  const [hoverStar,    setHoverStar]    = useState<number | null>(null);
+  const [ratingBusy,   setRatingBusy]   = useState(false);
+  const [avgRating,    setAvgRating]    = useState<number>(0);
+
   useEffect(() => {
     if (!id) return;
     const numId = Number(id);
 
     agentService.getById(numId)
-      .then(setAgent)
+      .then((a) => { setAgent(a); setAvgRating(a.rating ?? 0); })
       .finally(() => setLoadingA(false));
 
     agentService.getProperties(numId)
       .then(setListings)
       .finally(() => setLoadingL(false));
   }, [id]);
+
+  useEffect(() => {
+    if (!id || !user) return;
+    agentService.getMyRating(Number(id))
+      .then(({ rating }) => setMyRating(rating))
+      .catch(() => {});
+  }, [id, user]);
+
+  const handleRate = async (star: number) => {
+    if (!user) { open('login'); return; }
+    if (ratingBusy) return;
+    setRatingBusy(true);
+    try {
+      const { newAverage } = await agentService.rate(Number(id), star);
+      setMyRating(star);
+      setAvgRating(newAverage);
+    } finally {
+      setRatingBusy(false);
+    }
+  };
 
   if (loadingA) {
     return (
@@ -87,6 +117,39 @@ const AgentProfilePage = () => {
               <div>
                 <p className="text-lg font-bold text-on-surface capitalize">{agent.role}</p>
                 <p className="text-xs text-on-surface-variant">Type</p>
+              </div>
+            </div>
+
+            {/* Star rating */}
+            <div className="flex items-center gap-3 mb-6">
+              <div className="flex items-center gap-0.5">
+                {[1, 2, 3, 4, 5].map((star) => {
+                  const filled = (hoverStar ?? myRating ?? 0) >= star;
+                  return (
+                    <button
+                      key={star}
+                      disabled={ratingBusy}
+                      onClick={() => handleRate(star)}
+                      onMouseEnter={() => setHoverStar(star)}
+                      onMouseLeave={() => setHoverStar(null)}
+                      className="text-amber-400 transition-transform hover:scale-110 disabled:opacity-50"
+                    >
+                      <span
+                        className="material-symbols-outlined text-[26px]"
+                        style={{ fontVariationSettings: filled ? "'FILL' 1" : "'FILL' 0" }}
+                      >
+                        star
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="text-sm text-on-surface-variant">
+                <span className="font-bold text-on-surface">{avgRating.toFixed(1)}</span>
+                {myRating
+                  ? <span className="ml-1.5 text-xs">(your rating: {myRating}★)</span>
+                  : <span className="ml-1.5 text-xs">— Rate this agent</span>
+                }
               </div>
             </div>
 

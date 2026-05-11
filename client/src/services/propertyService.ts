@@ -37,12 +37,16 @@ function buildQuery(filters: Partial<FilterState>): string {
   const params = new URLSearchParams();
   params.set('page', String(filters.page ?? 1));
 
+  if (filters.minPrice) params.set('priceMin', String(filters.minPrice));
+
   // maxPrice takes priority over the 0-100 slider value
   if (filters.maxPrice) {
     params.set('priceRange', String(filters.maxPrice));
   } else if (filters.priceRange !== undefined && filters.priceRange < 100) {
     params.set('priceRange', String(filters.priceRange * 1_000_000));
   }
+
+  filters.amenities?.forEach((a) => params.append('amenity', a));
 
   // Property types — support multi-select, map display names → DB values
   if (filters.propertyTypes?.length) {
@@ -94,4 +98,7 @@ export const propertyService = {
 
   sendEnquiry: (propertyId: string | number, payload: { name?: string; email?: string; phone?: string; message: string }) =>
     api.post<{ success: boolean }>(`/properties/${propertyId}/enquiry`, payload),
+
+  recordView: (propertyId: string | number) =>
+    api.post<{ success: boolean }>(`/properties/${propertyId}/view`, {}),
 };

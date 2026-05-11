@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useFavourites } from '../../hooks/useFavourites';
 import { formatINR } from '../../utils/formatINR';
@@ -17,6 +17,7 @@ import RecommendedSection from '../../components/home/RecommendedSection';
 import EmiCalculator from '../../components/detail/EmiCalculator';
 import { usePropertyDetail } from '../../hooks/usePropertyDetail';
 import { useSimilarProperties } from '../../hooks/useSimilarProperties';
+import { propertyService } from '../../services/propertyService';
 
 const MAP_IMAGE =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuDz2vDacJKsq6UUycICrPPvIFVxX4xk6z-_XgOX7isJosxpbfVTpbGsnnRyvDqZU-Bf9cksD7buYC_RDY0u5-BhruKKy4RKJ_04VL6EXpJhO_-k2Dow00Ov5_AcARLGn_l1Lc4WS1EgkJq9PpzoPGYfOpuaSruuYozuQvY3I_wmUjWLeErLe5QSAlkxo4nY-iKeGQd6X8XwoWhZNZ1oYHwMFnfqoVpyAHUBOo9R90DAIAW3aiBpKSAs3hud9OnzmJLSidbKqZ0PttY';
@@ -31,6 +32,10 @@ const DetailPage = () => {
   const [modal, setModal]      = useState<ModalMode | null>(null);
 
   const { properties: similar } = useSimilarProperties(property?.city, property?.id);
+
+  useEffect(() => {
+    if (id) propertyService.recordView(id).catch(() => {});
+  }, [id]);
 
   if (loading || !property) {
     return (
@@ -76,6 +81,12 @@ const DetailPage = () => {
               </span>
               <span className="text-body-sm hidden sm:inline">Save</span>
             </button>
+            {property.viewCount != null && property.viewCount > 0 && (
+              <span className="flex items-center gap-1 text-xs text-on-surface-variant">
+                <span className="material-symbols-outlined text-[16px]">visibility</span>
+                {property.viewCount.toLocaleString('en-IN')}
+              </span>
+            )}
             <button
               onClick={() => navigator.share?.({ title: property.title, url: window.location.href })}
               className="flex items-center gap-1.5 text-on-surface-variant hover:text-primary transition-colors"

@@ -8,6 +8,7 @@ import AvailabilityFilter from './AvailabilityFilter';
 import PostedByFilter from './PostedByFilter';
 import AgeFilter from './AgeFilter';
 import FilterSection from './FilterSection';
+import AmenitiesFilter from './AmenitiesFilter';
 
 interface SidebarFiltersProps {
   filters: FilterState;
@@ -21,11 +22,13 @@ const SidebarFilters = ({ filters, onFilterChange, onClearAll }: SidebarFiltersP
     filters.status,
     (filters.propertyTypes?.length ?? 0) > 0,
     (filters.bhk?.length ?? 0) > 0,
-    filters.priceRange !== undefined && filters.priceRange < 100,
+    filters.minPrice,
+    filters.maxPrice,
     (filters.furnishing?.length ?? 0) > 0,
     filters.availability,
     filters.ageOfProperty,
     filters.postedBy,
+    (filters.amenities?.length ?? 0) > 0,
   ].filter(Boolean).length;
 
   return (
@@ -47,8 +50,13 @@ const SidebarFilters = ({ filters, onFilterChange, onClearAll }: SidebarFiltersP
         <div className="px-md pb-md space-y-0">
           <FilterSection label="Budget">
             <PriceRangeFilter
-              value={filters.priceRange}
-              onChange={(v) => onFilterChange('priceRange', v)}
+              minPrice={filters.minPrice}
+              maxPrice={filters.maxPrice}
+              onChange={(patch) => {
+                if ('minPrice' in patch) onFilterChange('minPrice', patch.minPrice);
+                if ('maxPrice' in patch) onFilterChange('maxPrice', patch.maxPrice);
+                if ('priceRange' in patch) onFilterChange('priceRange', patch.priceRange);
+              }}
             />
           </FilterSection>
 
@@ -91,6 +99,13 @@ const SidebarFilters = ({ filters, onFilterChange, onClearAll }: SidebarFiltersP
             <PostedByFilter
               selected={filters.postedBy}
               onChange={(v) => onFilterChange('postedBy', v)}
+            />
+          </FilterSection>
+
+          <FilterSection label="Amenities" defaultOpen={false}>
+            <AmenitiesFilter
+              selected={filters.amenities}
+              onChange={(v) => onFilterChange('amenities', v)}
             />
           </FilterSection>
         </div>
