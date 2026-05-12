@@ -36,9 +36,18 @@ const AgentCard = ({ agent }: { agent: Agent }) => {
       {/* Header row */}
       <div className="flex items-start gap-4">
         <div className="w-16 h-16 rounded-full overflow-hidden bg-primary text-white text-xl font-bold flex items-center justify-center flex-shrink-0 border-2 border-primary/20">
-          {agent.avatar
-            ? <img src={agent.avatar} alt={agent.name} className="w-full h-full object-cover" />
-            : initials}
+          {agent.avatar && (
+            <img
+              src={agent.avatar}
+              alt={agent.name}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = 'none';
+                (e.currentTarget.nextElementSibling as HTMLElement | null)?.style.setProperty('display', 'flex');
+              }}
+            />
+          )}
+          <span style={{ display: agent.avatar ? 'none' : 'flex' }}>{initials}</span>
         </div>
         <div className="flex-1 min-w-0">
           <button

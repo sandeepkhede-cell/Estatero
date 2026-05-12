@@ -81,22 +81,22 @@ function timeAgo(iso: string): string {
 
 const ProfilePage = () => {
   const navigate           = useNavigate();
-  const { user, logout }   = useAuth();
+  const { user, logout, loading: authLoading } = useAuth();
   const { open }           = useAuthModal();
   const { toggle }         = useFavourites();
   const { properties: savedProperties, loading: loadingS, toggle: savedToggle } = useSavedProperties();
 
-  const [tab,        setTab]        = useState<Tab>('listings');
+  const [tab,        setTab]        = useState<Tab>(() => canPost(user?.role) ? 'listings' : 'saved');
   const [profile,    setProfile]    = useState<UserProfile | null>(null);
   const [listings,   setListings]   = useState<Property[]>([]);
   const [inquiries,     setInquiries]     = useState<Inquiry[]>([]);
   const [sentInquiries, setSentInquiries] = useState<SentInquiry[]>([]);
   const [unread,        setUnread]        = useState(0);
-  const [seenReplies,   setSeenReplies]   = useState<Set<number>>(() => {
+  const [seenReplies,   setSeenReplies]   = useState<Record<number, string>>(() => {
     try {
       const s = localStorage.getItem('estatero_seen_replies');
-      return new Set(s ? (JSON.parse(s) as number[]) : []);
-    } catch { return new Set<number>(); }
+      return s ? (JSON.parse(s) as Record<number, string>) : {};
+    } catch { return {}; }
   });
   const [loadingP,   setLoadingP]   = useState(true);
   const [loadingL,   setLoadingL]   = useState(true);
@@ -137,6 +137,7 @@ const ProfilePage = () => {
   const agentAvatarRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) { open('login'); return; }
     userService.getById(user.id)
       .then((p) => { setProfile(p); setEditName(p.name); setEditPhone(p.phone ?? ''); })
@@ -169,26 +170,43 @@ const ProfilePage = () => {
           inquiryService.getAll()
             .then(({ inquiries: list, unreadCount }) => { setInquiries(list); setUnread(unreadCount); })
             .catch(() => {});
-        }, 30_000)
+        }, 10_000)
       : setInterval(() => {
           inquiryService.getSent()
             .then(({ inquiries: list }) => setSentInquiries(list))
             .catch(() => {});
-        }, 30_000);
+        }, 10_000);
 
     return () => clearInterval(poll);
-  }, [user]);
+  }, [user, authLoading]);
+
+  // When the poll detects a newly-unread inquiry that's already open, refresh its messages
+  useEffect(() => {
+    if (!expandedId) return;
+    const expanded = inquiries.find((q) => q.id === expandedId);
+    if (!expanded || expanded.is_read) return;
+    inquiryService.getMessages(expandedId)
+      .then(({ messages }) => setThreadMap((prev) => ({ ...prev, [expandedId]: messages })))
+      .catch(() => {});
+  }, [inquiries]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (tab !== 'enquiries' || !user || canPost(user.role)) return;
-    const toMark = sentInquiries.filter((q) => q.reply_message).map((q) => q.id);
-    if (!toMark.length) return;
+    const withReplies = sentInquiries.filter((q) => q.reply_message && q.replied_at);
+    if (!withReplies.length) return;
     setSeenReplies((prev) => {
-      const next = new Set([...prev, ...toMark]);
-      try { localStorage.setItem('estatero_seen_replies', JSON.stringify([...next])); } catch { /* noop */ }
+      const next = { ...prev };
+      withReplies.forEach((q) => { next[q.id] = q.replied_at!; });
+      try { localStorage.setItem('estatero_seen_replies', JSON.stringify(next)); } catch { /* noop */ }
       return next;
     });
-  }, [tab, sentInquiries, user]);
+  }, [tab, user]); // intentionally excludes sentInquiries — must only run when tab opens, not on every poll
+
+  if (authLoading) return (
+    <div className="min-h-[60vh] flex items-center justify-center bg-surface-bright">
+      <span className="material-symbols-outlined animate-spin text-primary text-5xl">progress_activity</span>
+    </div>
+  );
 
   if (!user) return null;
 
@@ -586,9 +604,9 @@ const ProfilePage = () => {
                     </span>
                   )}
                   {!canPost(user.role) && (() => {
-                    const n = sentInquiries.filter((q) => q.reply_message && !seenReplies.has(q.id)).length;
+                    const n = sentInquiries.filter((q) => q.reply_message && q.replied_at && (!seenReplies[q.id] || seenReplies[q.id] < q.replied_at)).length;
                     return n > 0 ? (
-                      <span className="ml-1.5 inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white text-[10px] font-bold">
+                      <span className="ml-1.5 inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-white text-[10px] font-bold">
                         {n > 99 ? '99+' : n}
                       </span>
                     ) : null;
@@ -719,60 +737,57 @@ const ProfilePage = () => {
                 {sentInquiries.map((q) => {
                   const isExpanded  = expandedId === q.id;
                   const thread      = threadMap[q.id];
-                  const hasNewReply = !!(q.reply_message && !seenReplies.has(q.id));
-                  const initials    = (q.property_title ?? 'P')
+                  const hasNewReply = !!(q.reply_message && q.replied_at && (!seenReplies[q.id] || seenReplies[q.id] < q.replied_at));
+                  const propInitials = (q.property_title ?? 'P')
                     .split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
                   return (
-                    <div key={q.id} className={`bg-white rounded-xl border overflow-hidden transition-colors ${hasNewReply ? 'border-blue-400 bg-blue-50' : 'border-gray-100'}`}>
+                    <div key={q.id} className={`bg-white rounded-xl border overflow-hidden transition-colors ${hasNewReply ? 'border-primary bg-primary/5' : 'border-gray-100'}`}>
 
-                      {/* Card header — identical structure to agent side */}
                       <button
                         className="w-full text-left px-5 pt-4 pb-3 flex items-start justify-between gap-4"
                         onClick={() => toggleExpand(q.id)}
                       >
                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                          {/* Avatar circle */}
                           <div className="w-10 h-10 rounded-full bg-primary/10 text-primary font-bold text-sm flex items-center justify-center flex-shrink-0">
                             {q.property_title
-                              ? initials
+                              ? propInitials
                               : <span className="material-symbols-outlined text-[18px]">home</span>
                             }
                           </div>
 
                           <div className="min-w-0">
-                            {/* Title row */}
-                            <p className="text-sm font-bold text-on-surface flex items-center gap-1.5 flex-wrap">
+                            <p className="text-sm font-bold text-on-surface flex items-center gap-1.5">
                               {q.property_title ?? 'Property Enquiry'}
                               {hasNewReply && (
                                 <>
-                                  <span className="inline-block w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
-                                  <span className="text-[10px] font-bold bg-blue-500 text-white px-1.5 py-0.5 rounded-full">New Reply</span>
+                                  <span className="inline-block w-2 h-2 rounded-full bg-primary flex-shrink-0" />
+                                  <span className="text-[10px] font-bold bg-primary text-white px-1.5 py-0.5 rounded-full">New Reply</span>
                                 </>
                               )}
                               {!q.reply_message && (
                                 <span className="text-[10px] font-semibold text-on-surface-variant bg-gray-100 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
                                   <span className="material-symbols-outlined text-[10px]">schedule</span>
-                                  Awaiting reply
+                                  Awaiting
                                 </span>
                               )}
                             </p>
 
-                            {/* Sub-line: city / location */}
-                            {(q.property_city || q.property_location) && (
-                              <div className="flex items-center gap-1 mt-0.5">
-                                <span className="material-symbols-outlined text-[12px] text-on-surface-variant">location_on</span>
-                                <p className="text-xs text-on-surface-variant truncate">
+                            <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                              {(q.property_city || q.property_location) && (
+                                <span className="flex items-center gap-0.5 text-xs text-on-surface-variant">
+                                  <span className="material-symbols-outlined text-[12px]">location_on</span>
                                   {[q.property_city, q.property_location].filter(Boolean).join(' · ')}
-                                </p>
-                              </div>
-                            )}
-
-                            {/* Message snippet */}
-                            <p className="text-xs text-on-surface-variant mt-0.5 line-clamp-1 italic">"{q.message}"</p>
+                                </span>
+                              )}
+                              {q.responder_name && (
+                                <span className="text-xs text-on-surface-variant">
+                                  · {q.responder_name}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
 
-                        {/* Right: time + chevron */}
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <span className="text-xs text-on-surface-variant">{timeAgo(q.created_at)}</span>
                           <span className={`material-symbols-outlined text-on-surface-variant text-[20px] transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
@@ -781,7 +796,6 @@ const ProfilePage = () => {
                         </div>
                       </button>
 
-                      {/* Expanded thread — identical to agent side */}
                       {isExpanded && (
                         <div className="px-5 pb-5 border-t border-gray-100">
                           <div className="pt-4 space-y-3 max-h-[420px] overflow-y-auto pr-1">
@@ -804,7 +818,6 @@ const ProfilePage = () => {
                             })}
                           </div>
 
-                          {/* Compose — same footer layout as agent side */}
                           <div className="pt-4 border-t border-gray-100 mt-4">
                             <textarea
                               rows={2}
@@ -856,7 +869,7 @@ const ProfilePage = () => {
                 return (
                   <div
                     key={q.id}
-                    className={`bg-white rounded-xl border overflow-hidden transition-colors ${q.is_read ? 'border-gray-100' : 'border-blue-400 bg-blue-50'}`}
+                    className={`bg-white rounded-xl border overflow-hidden transition-colors ${q.is_read ? 'border-gray-100' : 'border-primary bg-primary/5'}`}
                   >
                     {/* Card header */}
                     <button
@@ -875,8 +888,8 @@ const ProfilePage = () => {
                             {q.sender_name ?? 'Anonymous'}
                             {!q.is_read && (
                               <>
-                                <span className="inline-block w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
-                                <span className="text-[10px] font-bold bg-blue-500 text-white px-1.5 py-0.5 rounded-full">New</span>
+                                <span className="inline-block w-2 h-2 rounded-full bg-primary flex-shrink-0" />
+                                <span className="text-[10px] font-bold bg-primary text-white px-1.5 py-0.5 rounded-full">New</span>
                               </>
                             )}
                           </p>
