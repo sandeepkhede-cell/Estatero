@@ -21,7 +21,7 @@ const ListingsPage = () => {
   const navigate  = useNavigate();
   const { toggle } = useFavourites();
 
-  const { filters, updateFilter, clearAll } = useFilters();
+  const { filters, updateFilter, updateFilters, clearAll } = useFilters();
   const { properties, loading, error, total, totalPages } = useProperties(filters);
 
   const handleCardClick = (id: Property['id']) => navigate(`/property/${id}`);
@@ -44,6 +44,7 @@ const ListingsPage = () => {
         <SidebarFilters
           filters={filters}
           onFilterChange={updateFilter}
+          onFiltersChange={updateFilters}
           onClearAll={clearAll}
         />
 

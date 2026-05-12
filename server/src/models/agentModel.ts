@@ -120,9 +120,10 @@ export interface InquiryPayload {
 }
 
 export async function saveContactInquiry(payload: InquiryPayload): Promise<void> {
-  await pool.query(
+  const { rows } = await pool.query<{ id: number }>(
     `INSERT INTO inquiries (agent_id, property_id, sender_name, sender_email, sender_phone, message)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING id`,
     [
       payload.agentId    ?? null,
       payload.propertyId ?? null,
@@ -131,5 +132,10 @@ export async function saveContactInquiry(payload: InquiryPayload): Promise<void>
       payload.phone      ?? null,
       payload.message,
     ],
+  );
+  await pool.query(
+    `INSERT INTO inquiry_messages (inquiry_id, sender_type, sender_name, content)
+     VALUES ($1, 'buyer', $2, $3)`,
+    [rows[0].id, payload.name ?? null, payload.message],
   );
 }

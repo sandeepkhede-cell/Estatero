@@ -1,13 +1,23 @@
 import { useState, FormEvent, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useAuthModal } from '../../context/AuthModalContext';
+import type { UserRole } from '../../types/auth';
 
 type Tab = 'login' | 'register';
+
+const ROLE_OPTIONS: { value: UserRole; label: string; description: string }[] = [
+  { value: 'buyer',   label: 'Buyer',   description: 'Looking to buy or rent' },
+  { value: 'owner',   label: 'Owner',   description: 'Selling my own property' },
+  { value: 'agent',   label: 'Agent',   description: 'Real estate professional' },
+  { value: 'builder', label: 'Builder', description: 'Developer / construction firm' },
+];
 
 const inputCls = 'w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent';
 
 const AuthModal = () => {
+  const navigate = useNavigate();
   const { login, register } = useAuth();
   const { isOpen, tab: initialTab, close } = useAuthModal();
 
@@ -16,6 +26,7 @@ const AuthModal = () => {
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
   const [confirm,  setConfirm]  = useState('');
+  const [role,     setRole]     = useState<UserRole>('buyer');
   const [error,    setError]    = useState('');
   const [busy,     setBusy]     = useState(false);
 
@@ -31,7 +42,7 @@ const AuthModal = () => {
 
   if (!isOpen) return null;
 
-  const switchTab = (t: Tab) => { setTab(t); setError(''); };
+  const switchTab = (t: Tab) => { setTab(t); setError(''); setRole('buyer'); };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -44,9 +55,9 @@ const AuthModal = () => {
     setBusy(true);
     try {
       if (tab === 'login') await login({ email, password });
-      else                 await register({ name: name.trim(), email, password });
+      else                 await register({ name: name.trim(), email, password, role });
       // Reset and close on success
-      setName(''); setEmail(''); setPassword(''); setConfirm('');
+      setName(''); setEmail(''); setPassword(''); setConfirm(''); setRole('buyer');
       close();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
@@ -104,13 +115,48 @@ const AuthModal = () => {
             </div>
           )}
 
+          {tab === 'register' && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">I am a</label>
+              <div className="grid grid-cols-2 gap-2">
+                {ROLE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setRole(opt.value)}
+                    className={[
+                      'flex flex-col items-start px-3 py-2.5 rounded-lg border text-left transition-all',
+                      role === opt.value
+                        ? 'border-primary bg-primary/5 text-primary'
+                        : 'border-gray-200 text-gray-600 hover:border-primary/50',
+                    ].join(' ')}
+                  >
+                    <span className="text-sm font-semibold">{opt.label}</span>
+                    <span className="text-[10px] text-gray-400 mt-0.5">{opt.description}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Email</label>
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required className={inputCls} />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Password</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide">Password</label>
+              {tab === 'login' && (
+                <button
+                  type="button"
+                  onClick={() => { close(); navigate('/forgot-password'); }}
+                  className="text-xs text-primary font-semibold hover:underline"
+                >
+                  Forgot password?
+                </button>
+              )}
+            </div>
             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={tab === 'register' ? 'Min. 8 characters' : '••••••••'} required className={inputCls} />
           </div>
 

@@ -19,7 +19,8 @@ const PostedByFilter = ({ selected, onChange }: PostedByFilterProps) => (
           type="radio"
           name="postedBy"
           checked={selected === value}
-          onChange={() => onChange?.(selected === value ? undefined : value)}
+          onChange={() => {}}
+          onClick={() => onChange?.(selected === value ? undefined : value)}
           className="text-primary focus:ring-primary h-4 w-4"
         />
         <span className="text-body-sm text-on-surface group-hover:text-primary transition-colors">

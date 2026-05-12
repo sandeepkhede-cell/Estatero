@@ -13,10 +13,11 @@ import AmenitiesFilter from './AmenitiesFilter';
 interface SidebarFiltersProps {
   filters: FilterState;
   onFilterChange: <K extends keyof FilterState>(key: K, value: FilterState[K]) => void;
+  onFiltersChange: (patch: Partial<FilterState>) => void;
   onClearAll?: () => void;
 }
 
-const SidebarFilters = ({ filters, onFilterChange, onClearAll }: SidebarFiltersProps) => {
+const SidebarFilters = ({ filters, onFilterChange, onFiltersChange, onClearAll }: SidebarFiltersProps) => {
   const activeCount = [
     filters.city,
     filters.status,
@@ -53,9 +54,8 @@ const SidebarFilters = ({ filters, onFilterChange, onClearAll }: SidebarFiltersP
               minPrice={filters.minPrice}
               maxPrice={filters.maxPrice}
               onChange={(patch) => {
-                if ('minPrice' in patch) onFilterChange('minPrice', patch.minPrice);
-                if ('maxPrice' in patch) onFilterChange('maxPrice', patch.maxPrice);
-                if ('priceRange' in patch) onFilterChange('priceRange', patch.priceRange);
+                const { priceRange: _legacy, ...pricePatch } = patch;
+                onFiltersChange(pricePatch);
               }}
             />
           </FilterSection>

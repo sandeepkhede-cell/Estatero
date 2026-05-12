@@ -13,9 +13,17 @@ export const useFilters = () => {
 
   const updateFilter = useCallback(
     <K extends keyof FilterState>(key: K, value: FilterState[K]) => {
-      // Any filter change except pagination resets to page 1
       const updated: FilterState = { ...filters, [key]: value };
       if (key !== 'page') updated.page = 1;
+      setSearchParams(filtersToParams(updated), { replace: true });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [searchParams, setSearchParams],
+  );
+
+  const updateFilters = useCallback(
+    (patch: Partial<FilterState>) => {
+      const updated: FilterState = { ...filters, ...patch, page: 1 };
       setSearchParams(filtersToParams(updated), { replace: true });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -31,5 +39,5 @@ export const useFilters = () => {
     [updateFilter],
   );
 
-  return { filters, updateFilter, clearAll, setSortBy };
+  return { filters, updateFilter, updateFilters, clearAll, setSortBy };
 };

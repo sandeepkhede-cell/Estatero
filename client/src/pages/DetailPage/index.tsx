@@ -30,6 +30,7 @@ const DetailPage = () => {
   const { property, loading }  = usePropertyDetail(id);
   const { toggle, isFavourited } = useFavourites();
   const [modal, setModal]      = useState<ModalMode | null>(null);
+  const [showNumber, setShowNumber] = useState(false);
 
   const { properties: similar } = useSimilarProperties(property?.city, property?.id);
 
@@ -160,25 +161,34 @@ const DetailPage = () => {
                 )}
 
                 <div className="mt-5 space-y-3">
-                  <button
-                    onClick={() => setModal('contact')}
-                    className="w-full h-12 rounded-xl bg-primary text-on-primary font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity shadow-sm"
-                  >
-                    <span
-                      className="material-symbols-outlined"
-                      style={{ fontVariationSettings: "'FILL' 1" }}
+                  {property.agent?.phone ? (
+                    <button
+                      onClick={() => { if (showNumber) handleCall(); else setShowNumber(true); }}
+                      className="w-full h-12 rounded-xl bg-primary text-on-primary font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity shadow-sm"
                     >
-                      person
-                    </span>
-                    Contact Agent
-                  </button>
-                  <button
-                    onClick={() => setModal('inquiry')}
-                    className="w-full h-12 rounded-xl border-2 border-primary text-primary font-semibold flex items-center justify-center gap-2 hover:bg-primary-fixed transition-colors"
-                  >
-                    <span className="material-symbols-outlined">chat</span>
-                    Send Inquiry
-                  </button>
+                      <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
+                        {showNumber ? 'call' : 'person'}
+                      </span>
+                      {showNumber ? property.agent.phone : 'Contact Agent'}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setModal('inquiry')}
+                      className="w-full h-12 rounded-xl bg-primary text-on-primary font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity shadow-sm"
+                    >
+                      <span className="material-symbols-outlined">chat</span>
+                      Send Enquiry
+                    </button>
+                  )}
+                  {property.agent?.phone && (
+                    <button
+                      onClick={() => setModal('inquiry')}
+                      className="w-full h-12 rounded-xl border-2 border-primary text-primary font-semibold flex items-center justify-center gap-2 hover:bg-primary-fixed transition-colors"
+                    >
+                      <span className="material-symbols-outlined">chat</span>
+                      Send Inquiry
+                    </button>
+                  )}
                 </div>
 
                 {property.status && (
@@ -212,7 +222,15 @@ const DetailPage = () => {
       {/* Mobile bottom bar */}
       <BottomActionBar
         onInquiry={()      => setModal('inquiry')}
-        onContactAgent={()  => setModal('contact')}
+        onContactAgent={()  => {
+          if (showNumber) {
+            handleCall();
+          } else {
+            setShowNumber(true);
+          }
+        }}
+        showNumber={showNumber}
+        agentPhone={property.agent?.phone}
       />
 
       {/* Contact / Inquiry modal */}

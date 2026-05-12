@@ -1,5 +1,14 @@
 import { api } from './api';
 
+export interface InquiryMessage {
+  id:          number;
+  inquiry_id:  number;
+  sender_type: 'buyer' | 'agent';
+  sender_name: string | null;
+  content:     string;
+  created_at:  string;
+}
+
 export interface Inquiry {
   id:                number;
   property_id:       number | null;
@@ -17,9 +26,25 @@ export interface Inquiry {
   property_city:     string | null;
 }
 
+export interface SentInquiry {
+  id:                number;
+  property_id:       number | null;
+  message:           string;
+  reply_message:     string | null;
+  replied_at:        string | null;
+  created_at:        string;
+  property_title:    string | null;
+  property_city:     string | null;
+  property_location: string | null;
+  responder_name:    string | null;
+}
+
 export const inquiryService = {
   getAll: () =>
     api.get<{ inquiries: Inquiry[]; unreadCount: number }>('/inquiries'),
+
+  getSent: () =>
+    api.get<{ inquiries: SentInquiry[] }>('/inquiries/sent'),
 
   markRead: (id: number) =>
     api.patch<{ success: boolean }>(`/inquiries/${id}/read`, {}),
@@ -29,4 +54,10 @@ export const inquiryService = {
 
   reply: (id: number, message: string) =>
     api.post<{ success: boolean; repliedAt: string }>(`/inquiries/${id}/reply`, { message }),
+
+  getMessages: (id: number) =>
+    api.get<{ messages: InquiryMessage[] }>(`/inquiries/${id}/messages`),
+
+  sendMessage: (id: number, content: string) =>
+    api.post<{ message: InquiryMessage }>(`/inquiries/${id}/messages`, { content }),
 };

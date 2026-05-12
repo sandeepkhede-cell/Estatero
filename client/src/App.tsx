@@ -18,6 +18,8 @@ import ProfilePage from './pages/ProfilePage';
 import AgentProfilePage from './pages/AgentProfilePage';
 import AgentsPage from './pages/AgentsPage';
 import ComparePage from './pages/ComparePage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 
 const MainLayout = () => (
   <div className="flex flex-col min-h-screen">
@@ -47,7 +49,9 @@ const App = () => (
             <Route path="/profile"        element={<ProfilePage />} />
             <Route path="/agents"          element={<AgentsPage />} />
             <Route path="/agent/:id"      element={<AgentProfilePage />} />
-            <Route path="/compare"        element={<ComparePage />} />
+            <Route path="/compare"          element={<ComparePage />} />
+            <Route path="/forgot-password"  element={<ForgotPasswordPage />} />
+            <Route path="/reset-password"   element={<ResetPasswordPage />} />
           </Route>
         </Routes>
       </AuthModalProvider>

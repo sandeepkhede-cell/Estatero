@@ -36,8 +36,9 @@ export interface PropertyRow {
   updated_at: Date;
   // joined
   images: string[] | null;
-  agent_name: string | null;
-  agent_role: string | null;
+  agent_name:  string | null;
+  agent_role:  string | null;   // u.role enum (agent|owner|builder)
+  agent_bio:   string | null;   // ag.bio → shown as tagline
   agent_avatar: string | null;
   agent_phone: string | null;
   amenities: Array<{ icon: string; label: string }> | null;
@@ -76,13 +77,14 @@ export interface NearbyPlace {
 }
 
 export interface AgentDTO {
-  id: number;
-  name: string;
-  role: string;
-  avatar: string;
-  phone?: string;
-  bio?: string;
-  rating?: number;
+  id:            number;
+  name:          string;
+  role:          string;
+  tagline?:      string;
+  avatar:        string;
+  phone?:        string;
+  bio?:          string;
+  rating?:       number;
   listingsCount?: number;
 }
 

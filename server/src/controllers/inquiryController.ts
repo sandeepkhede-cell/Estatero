@@ -137,6 +137,117 @@ export async function replyToInquiry(req: AuthRequest, res: Response, next: Next
   }
 }
 
+export async function getSentInquiries(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const userId = req.user!.userId;
+
+    const { rows } = await pool.query(
+      `SELECT
+         i.id,
+         i.property_id,
+         i.message,
+         i.reply_message,
+         i.replied_at,
+         i.created_at,
+         p.title    AS property_title,
+         p.city     AS property_city,
+         p.location AS property_location,
+         u.name     AS responder_name
+       FROM inquiries i
+       LEFT JOIN properties p  ON p.id  = i.property_id
+       LEFT JOIN agents     ag ON ag.id = COALESCE(i.agent_id, p.agent_id)
+       LEFT JOIN users      u  ON u.id  = ag.user_id
+       WHERE i.sender_email = (SELECT email FROM users WHERE id = $1)
+       ORDER BY i.created_at DESC`,
+      [userId],
+    );
+
+    res.json({ inquiries: rows });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getInquiryMessages(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const userId    = req.user!.userId;
+    const inquiryId = parseInt(req.params.id, 10);
+    if (isNaN(inquiryId)) { res.status(400).json({ error: 'Invalid ID' }); return; }
+
+    const { rows: auth } = await pool.query(
+      `SELECT i.id
+       FROM inquiries i
+       LEFT JOIN properties p  ON p.id  = i.property_id
+       LEFT JOIN agents     ag ON ag.id = COALESCE(i.agent_id, p.agent_id)
+       WHERE i.id = $1
+         AND (ag.user_id = $2 OR i.sender_email = (SELECT email FROM users WHERE id = $2))`,
+      [inquiryId, userId],
+    );
+    if (!auth.length) { res.status(404).json({ error: 'Not found' }); return; }
+
+    const { rows } = await pool.query(
+      `SELECT id, inquiry_id, sender_type, sender_name, content, created_at
+       FROM inquiry_messages
+       WHERE inquiry_id = $1
+       ORDER BY created_at ASC`,
+      [inquiryId],
+    );
+    res.json({ messages: rows });
+  } catch (err) { next(err); }
+}
+
+export async function postInquiryMessage(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const userId    = req.user!.userId;
+    const inquiryId = parseInt(req.params.id, 10);
+    if (isNaN(inquiryId)) { res.status(400).json({ error: 'Invalid ID' }); return; }
+
+    const { content } = req.body as { content?: string };
+    if (!content?.trim()) { res.status(400).json({ error: 'content is required' }); return; }
+
+    const { rows } = await pool.query<{
+      is_agent:    boolean;
+      sender_name: string | null;
+      user_name:   string;
+    }>(
+      `SELECT
+         (ag.user_id = $2)                         AS is_agent,
+         i.sender_name,
+         (SELECT name FROM users WHERE id = $2)    AS user_name
+       FROM inquiries i
+       LEFT JOIN properties p  ON p.id  = i.property_id
+       LEFT JOIN agents     ag ON ag.id = COALESCE(i.agent_id, p.agent_id)
+       WHERE i.id = $1
+         AND (ag.user_id = $2 OR i.sender_email = (SELECT email FROM users WHERE id = $2))`,
+      [inquiryId, userId],
+    );
+    if (!rows.length) { res.status(404).json({ error: 'Not found' }); return; }
+
+    const senderType = rows[0].is_agent ? 'agent' : 'buyer';
+    const senderName = rows[0].is_agent
+      ? rows[0].user_name
+      : (rows[0].sender_name ?? rows[0].user_name);
+
+    const { rows: inserted } = await pool.query(
+      `INSERT INTO inquiry_messages (inquiry_id, sender_type, sender_name, content)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, inquiry_id, sender_type, sender_name, content, created_at`,
+      [inquiryId, senderType, senderName, content.trim()],
+    );
+
+    if (senderType === 'agent') {
+      await pool.query(
+        `UPDATE inquiries SET reply_message = $2, replied_at = NOW(), is_read = TRUE WHERE id = $1`,
+        [inquiryId, content.trim()],
+      );
+    } else {
+      await pool.query(`UPDATE inquiries SET is_read = FALSE WHERE id = $1`, [inquiryId]);
+    }
+
+    res.json({ message: inserted[0] });
+  } catch (err) { next(err); }
+}
+
 export async function getUnreadCount(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const userId = req.user!.userId;

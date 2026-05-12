@@ -41,11 +41,12 @@ function toDTO(row: PropertyRow): PropertyDTO {
     amenities:    row.amenities ?? undefined,
     nearbyPlaces: row.nearby_places ?? undefined,
     agent: row.agent_name ? {
-      id:     row.agent_id!,
-      name:   row.agent_name,
-      role:   row.agent_role ?? 'Agent',
-      avatar: row.agent_avatar ?? '',
-      phone:  row.agent_phone ?? undefined,
+      id:      row.agent_id!,
+      name:    row.agent_name,
+      role:    row.agent_role ?? 'agent',
+      tagline: row.agent_bio ?? undefined,
+      avatar:  row.agent_avatar ?? '',
+      phone:   row.agent_phone ?? undefined,
     } : undefined,
   };
 }
@@ -59,9 +60,10 @@ const BASE_SELECT = `
       ARRAY_AGG(pi.url ORDER BY pi.sort_order) FILTER (WHERE pi.url IS NOT NULL),
       '{}'
     ) AS images,
-    u.name          AS agent_name,
-    u.phone         AS agent_phone,
-    ag.bio          AS agent_role,
+    u.name           AS agent_name,
+    u.phone          AS agent_phone,
+    u.role           AS agent_role,
+    ag.bio           AS agent_bio,
     ag.profile_image AS agent_avatar,
     COALESCE(
       JSON_AGG(DISTINCT jsonb_build_object('icon', am.icon, 'label', am.label))
@@ -158,13 +160,8 @@ export async function findProperties(filters: PropertyFilters): Promise<Property
     params.push(filters.ageOfProperty);
   }
   if (filters.postedBy) {
-    if (filters.postedBy === 'owner') {
-      conditions.push(`(ag.agency_name IS NULL OR ag.agency_name = '')`);
-    } else if (filters.postedBy === 'agent') {
-      conditions.push(`(ag.agency_name IS NOT NULL AND ag.agency_name != '')`);
-    } else if (filters.postedBy === 'builder') {
-      conditions.push(`(ag.agency_name ILIKE '%builder%' OR ag.agency_name ILIKE '%construction%' OR ag.agency_name ILIKE '%developer%')`);
-    }
+    conditions.push(`u.role = $${i++}`);
+    params.push(filters.postedBy);
   }
   if (filters.q) {
     conditions.push(
@@ -185,13 +182,19 @@ export async function findProperties(filters: PropertyFilters): Promise<Property
   const dataSQL = `
     ${BASE_SELECT}
     ${WHERE}
-    GROUP BY p.id, u.name, u.phone, ag.bio, ag.profile_image
+    GROUP BY p.id, u.name, u.phone, u.role, ag.bio, ag.profile_image
     ORDER BY ${ORDER}
     LIMIT $${i++} OFFSET $${i++}
   `;
   params.push(limit, offset);
 
-  const countSQL = `SELECT COUNT(*) FROM properties p ${WHERE}`;
+  const countSQL = `
+    SELECT COUNT(DISTINCT p.id)
+    FROM properties p
+    LEFT JOIN agents ag ON ag.id = p.agent_id
+    LEFT JOIN users  u  ON u.id  = ag.user_id
+    ${WHERE}
+  `;
 
   const [dataRes, countRes] = await Promise.all([
     pool.query<PropertyRow>(dataSQL, params),
@@ -213,7 +216,7 @@ export async function findPropertyById(id: number): Promise<PropertyDTO | null> 
   const { rows } = await pool.query<PropertyRow>(
     `${BASE_SELECT}
      WHERE p.id = $1
-     GROUP BY p.id, u.name, u.phone, ag.bio, ag.profile_image`,
+     GROUP BY p.id, u.name, u.phone, u.role, ag.bio, ag.profile_image`,
     [id]
   );
   return rows[0] ? toDTO(rows[0]) : null;
@@ -230,7 +233,7 @@ export async function findFeaturedProperties(): Promise<PropertyDTO[]> {
   const { rows } = await pool.query<PropertyRow>(
     `${BASE_SELECT}
      WHERE p.is_featured = TRUE AND p.listing_status = 'active'
-     GROUP BY p.id, u.name, u.phone, ag.bio, ag.profile_image
+     GROUP BY p.id, u.name, u.phone, u.role, ag.bio, ag.profile_image
      ORDER BY p.created_at DESC
      LIMIT 8`
   );
@@ -243,7 +246,7 @@ export async function searchProperties(q: string): Promise<PropertyDTO[]> {
      WHERE p.listing_status = 'active'
        AND to_tsvector('english', p.title || ' ' || p.location || ' ' || p.city)
            @@ plainto_tsquery('english', $1)
-     GROUP BY p.id, u.name, u.phone, ag.bio, ag.profile_image
+     GROUP BY p.id, u.name, u.phone, u.role, ag.bio, ag.profile_image
      ORDER BY p.created_at DESC
      LIMIT 20`,
     [q]
@@ -367,7 +370,7 @@ export async function findFavouriteProperties(userId: number): Promise<PropertyD
     `${BASE_SELECT}
      JOIN favourites fav ON fav.property_id = p.id AND fav.user_id = $1
      WHERE p.listing_status = 'active'
-     GROUP BY p.id, u.name, u.phone, ag.bio, ag.profile_image
+     GROUP BY p.id, u.name, u.phone, u.role, ag.bio, ag.profile_image
      ORDER BY MAX(fav.created_at) DESC`,
     [userId],
   );
@@ -392,7 +395,7 @@ export async function findPropertiesByAgentUserId(userId: number): Promise<Prope
   const { rows } = await pool.query<PropertyRow>(
     `${BASE_SELECT}
      WHERE ag.user_id = $1
-     GROUP BY p.id, u.name, u.phone, ag.bio, ag.profile_image
+     GROUP BY p.id, u.name, u.phone, u.role, ag.bio, ag.profile_image
      ORDER BY p.created_at DESC`,
     [userId],
   );
@@ -403,7 +406,7 @@ export async function findPropertiesByAgentId(agentId: number): Promise<Property
   const { rows } = await pool.query<PropertyRow>(
     `${BASE_SELECT}
      WHERE p.agent_id = $1 AND p.listing_status = 'active'
-     GROUP BY p.id, u.name, u.phone, ag.bio, ag.profile_image
+     GROUP BY p.id, u.name, u.phone, u.role, ag.bio, ag.profile_image
      ORDER BY p.created_at DESC`,
     [agentId],
   );

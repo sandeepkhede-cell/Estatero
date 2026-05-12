@@ -1,19 +1,18 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth';
-import { getMyInquiries, markInquiryRead, getUnreadCount, replyToInquiry } from '../controllers/inquiryController';
+import {
+  getMyInquiries, getSentInquiries, markInquiryRead, getUnreadCount, replyToInquiry,
+  getInquiryMessages, postInquiryMessage,
+} from '../controllers/inquiryController';
 
 const router = Router();
 
-// GET  /api/inquiries          — all enquiries for the logged-in user's listings
-router.get('/',           requireAuth, getMyInquiries);
-
-// GET  /api/inquiries/unread   — unread count badge
-router.get('/unread',     requireAuth, getUnreadCount);
-
-// PATCH /api/inquiries/:id/read  — mark one as read
+router.get('/',            requireAuth, getMyInquiries);
+router.get('/sent',        requireAuth, getSentInquiries);
+router.get('/unread',      requireAuth, getUnreadCount);
 router.patch('/:id/read',  requireAuth, markInquiryRead);
-
-// POST  /api/inquiries/:id/reply — send a reply (saves to DB + emails sender)
 router.post('/:id/reply',  requireAuth, replyToInquiry);
+router.get('/:id/messages',  requireAuth, getInquiryMessages);
+router.post('/:id/messages', requireAuth, postInquiryMessage);
 
 export default router;

@@ -190,16 +190,18 @@ const Header = ({
               </button>
             )}
 
-            <button
-              onClick={() => {
-                onPostProperty?.();
-                if (user) navigate('/post-property');
-                else openAuthModal('register');
-              }}
-              className="hidden sm:block bg-primary-container text-on-primary font-label-bold px-4 py-2 rounded-lg hover:bg-primary transition-all"
-            >
-              Post Property
-            </button>
+            {user?.role !== 'buyer' && (
+              <button
+                onClick={() => {
+                  onPostProperty?.();
+                  if (user) navigate('/post-property');
+                  else openAuthModal('register');
+                }}
+                className="hidden sm:block bg-primary-container text-on-primary font-label-bold px-4 py-2 rounded-lg hover:bg-primary transition-all"
+              >
+                Post Property
+              </button>
+            )}
           </div>
         </div>
 

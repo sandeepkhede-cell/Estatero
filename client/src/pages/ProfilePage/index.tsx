@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useAuthModal } from '../../context/AuthModalContext';
 import { userService, UserProfile } from '../../services/userService';
-import { inquiryService, Inquiry } from '../../services/inquiryService';
+import { inquiryService, Inquiry, SentInquiry, InquiryMessage } from '../../services/inquiryService';
 import { propertyService } from '../../services/propertyService';
 import { agentService, MyAgentProfile } from '../../services/agentService';
 import { Property } from '../../types/property';
@@ -29,6 +29,17 @@ async function uploadSingleFile(file: File): Promise<string> {
 }
 
 type Tab = 'listings' | 'saved' | 'enquiries';
+
+const CAN_POST_ROLES = ['agent', 'owner', 'builder'] as const;
+type PostingRole = typeof CAN_POST_ROLES[number];
+const canPost = (role?: string): role is PostingRole =>
+  CAN_POST_ROLES.includes(role as PostingRole);
+
+const ROLE_PROFILE_LABELS: Record<PostingRole, { section: string; companyLabel: string; licenseLabel: string; bioPlaceholder: string; showCompany: boolean; showLicense: boolean }> = {
+  agent:   { section: 'Agent Profile',   companyLabel: 'Agency Name',          licenseLabel: 'RERA / License Number', bioPlaceholder: 'Tell buyers about yourself…',            showCompany: true,  showLicense: true  },
+  owner:   { section: 'Owner Profile',   companyLabel: '',                     licenseLabel: '',                      bioPlaceholder: 'Tell buyers about yourself and the property…', showCompany: false, showLicense: false },
+  builder: { section: 'Builder Profile', companyLabel: 'Company / Developer Name', licenseLabel: 'RERA Number',       bioPlaceholder: 'Describe your company and projects…',    showCompany: true,  showLicense: true  },
+};
 
 interface EditForm {
   price:         string;
@@ -78,8 +89,15 @@ const ProfilePage = () => {
   const [tab,        setTab]        = useState<Tab>('listings');
   const [profile,    setProfile]    = useState<UserProfile | null>(null);
   const [listings,   setListings]   = useState<Property[]>([]);
-  const [inquiries,  setInquiries]  = useState<Inquiry[]>([]);
-  const [unread,     setUnread]     = useState(0);
+  const [inquiries,     setInquiries]     = useState<Inquiry[]>([]);
+  const [sentInquiries, setSentInquiries] = useState<SentInquiry[]>([]);
+  const [unread,        setUnread]        = useState(0);
+  const [seenReplies,   setSeenReplies]   = useState<Set<number>>(() => {
+    try {
+      const s = localStorage.getItem('estatero_seen_replies');
+      return new Set(s ? (JSON.parse(s) as number[]) : []);
+    } catch { return new Set<number>(); }
+  });
   const [loadingP,   setLoadingP]   = useState(true);
   const [loadingL,   setLoadingL]   = useState(true);
   const [loadingI,   setLoadingI]   = useState(true);
@@ -95,11 +113,13 @@ const ProfilePage = () => {
   const [confirmDeleteId, setConfirmDeleteId] = useState<Property['id'] | null>(null);
   const [deletingId,      setDeletingId]      = useState<Property['id'] | null>(null);
 
-  // Inquiry reply
-  const [replyingToId, setReplyingToId] = useState<number | null>(null);
-  const [replyDraft,   setReplyDraft]   = useState('');
-  const [replySending, setReplySending] = useState(false);
-  const [replyErr,     setReplyErr]     = useState('');
+  // Inquiry thread
+  const [threadMap,     setThreadMap]     = useState<Record<number, InquiryMessage[]>>({});
+  const [expandedId,    setExpandedId]    = useState<number | null>(null);
+  const [threadLoading, setThreadLoading] = useState(false);
+  const [msgDraft,      setMsgDraft]      = useState('');
+  const [msgSending,    setMsgSending]    = useState(false);
+  const [msgErr,        setMsgErr]        = useState('');
 
   // Listing edit modal
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
@@ -124,10 +144,17 @@ const ProfilePage = () => {
     userService.getProperties(user.id)
       .then(setListings)
       .finally(() => setLoadingL(false));
-    inquiryService.getAll()
-      .then(({ inquiries: list, unreadCount }) => { setInquiries(list); setUnread(unreadCount); })
-      .catch(() => {})
-      .finally(() => setLoadingI(false));
+    if (canPost(user.role)) {
+      inquiryService.getAll()
+        .then(({ inquiries: list, unreadCount }) => { setInquiries(list); setUnread(unreadCount); })
+        .catch(() => {})
+        .finally(() => setLoadingI(false));
+    } else {
+      inquiryService.getSent()
+        .then(({ inquiries: list }) => setSentInquiries(list))
+        .catch(() => {})
+        .finally(() => setLoadingI(false));
+    }
     agentService.getMe()
       .then((p) => {
         if (p) {
@@ -136,7 +163,32 @@ const ProfilePage = () => {
         }
       })
       .catch(() => {});
+
+    const poll = canPost(user.role)
+      ? setInterval(() => {
+          inquiryService.getAll()
+            .then(({ inquiries: list, unreadCount }) => { setInquiries(list); setUnread(unreadCount); })
+            .catch(() => {});
+        }, 30_000)
+      : setInterval(() => {
+          inquiryService.getSent()
+            .then(({ inquiries: list }) => setSentInquiries(list))
+            .catch(() => {});
+        }, 30_000);
+
+    return () => clearInterval(poll);
   }, [user]);
+
+  useEffect(() => {
+    if (tab !== 'enquiries' || !user || canPost(user.role)) return;
+    const toMark = sentInquiries.filter((q) => q.reply_message).map((q) => q.id);
+    if (!toMark.length) return;
+    setSeenReplies((prev) => {
+      const next = new Set([...prev, ...toMark]);
+      try { localStorage.setItem('estatero_seen_replies', JSON.stringify([...next])); } catch { /* noop */ }
+      return next;
+    });
+  }, [tab, sentInquiries, user]);
 
   if (!user) return null;
 
@@ -165,28 +217,42 @@ const ProfilePage = () => {
     } catch { /* silent */ }
   };
 
-  const openReply = (id: number) => {
-    setReplyingToId(id);
-    setReplyDraft('');
-    setReplyErr('');
+  const toggleExpand = async (id: number, markRead?: Inquiry) => {
+    if (expandedId === id) { setExpandedId(null); return; }
+    setExpandedId(id);
+    setMsgDraft('');
+    setMsgErr('');
+    if (markRead) handleMarkRead(markRead);
+    if (!threadMap[id]) {
+      setThreadLoading(true);
+      try {
+        const { messages } = await inquiryService.getMessages(id);
+        setThreadMap((prev) => ({ ...prev, [id]: messages }));
+      } catch { /* silent */ }
+      finally { setThreadLoading(false); }
+    }
   };
 
-  const handleReply = async (inquiry: Inquiry) => {
-    if (!replyDraft.trim()) { setReplyErr('Reply cannot be empty.'); return; }
-    setReplySending(true); setReplyErr('');
+  const handleSendMessage = async (inquiryId: number, senderIsAgent: boolean) => {
+    if (!msgDraft.trim()) { setMsgErr('Message cannot be empty.'); return; }
+    setMsgSending(true); setMsgErr('');
     try {
-      const { repliedAt } = await inquiryService.reply(inquiry.id, replyDraft.trim());
-      setInquiries((prev) => prev.map((q) =>
-        q.id === inquiry.id
-          ? { ...q, reply_message: replyDraft.trim(), replied_at: repliedAt, is_read: true }
-          : q,
-      ));
-      if (!inquiry.is_read) setUnread((n) => Math.max(0, n - 1));
-      setReplyingToId(null);
+      const { message } = await inquiryService.sendMessage(inquiryId, msgDraft.trim());
+      setThreadMap((prev) => ({ ...prev, [inquiryId]: [...(prev[inquiryId] ?? []), message] }));
+      setMsgDraft('');
+      if (senderIsAgent) {
+        setInquiries((prev) => prev.map((q) =>
+          q.id === inquiryId ? { ...q, reply_message: message.content, replied_at: message.created_at, is_read: true } : q,
+        ));
+      } else {
+        setSentInquiries((prev) => prev.map((q) =>
+          q.id === inquiryId ? { ...q, reply_message: q.reply_message } : q,
+        ));
+      }
     } catch (err) {
-      setReplyErr((err as Error).message);
+      setMsgErr((err as Error).message);
     } finally {
-      setReplySending(false);
+      setMsgSending(false);
     }
   };
 
@@ -337,21 +403,26 @@ const ProfilePage = () => {
               )}
             </div>
 
-            <button
-              onClick={() => navigate('/post-property')}
-              className="flex-shrink-0 bg-primary text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-container transition-colors"
-            >
-              + Post Property
-            </button>
+            {canPost(user.role) && (
+              <button
+                onClick={() => navigate('/post-property')}
+                className="flex-shrink-0 bg-primary text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-container transition-colors"
+              >
+                + Post Property
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Agent Profile card */}
+        {/* Role Profile card — hidden for buyers */}
+        {canPost(user.role) && (() => {
+          const roleLabels = ROLE_PROFILE_LABELS[user.role as PostingRole];
+          return (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 md:p-8 mb-8">
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-base font-bold text-on-surface flex items-center gap-2">
               <span className="material-symbols-outlined text-[20px] text-primary">real_estate_agent</span>
-              Agent Profile
+              {roleLabels.section}
             </h2>
             {agentProfile && !editingAgent && (
               <button
@@ -366,31 +437,35 @@ const ProfilePage = () => {
 
           {editingAgent ? (
             <form onSubmit={handleAgentSave} className="space-y-4 max-w-lg">
-              <div>
-                <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1">Agency / Company Name</label>
-                <input
-                  value={agentForm.agencyName}
-                  onChange={(e) => setAgentForm((f) => ({ ...f, agencyName: e.target.value }))}
-                  placeholder="e.g. Sunrise Realty"
-                  className={inputCls}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1">RERA / License Number</label>
-                <input
-                  value={agentForm.licenseNumber}
-                  onChange={(e) => setAgentForm((f) => ({ ...f, licenseNumber: e.target.value }))}
-                  placeholder="e.g. RERA12345678"
-                  className={inputCls}
-                />
-              </div>
+              {roleLabels.showCompany && (
+                <div>
+                  <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1">{roleLabels.companyLabel}</label>
+                  <input
+                    value={agentForm.agencyName}
+                    onChange={(e) => setAgentForm((f) => ({ ...f, agencyName: e.target.value }))}
+                    placeholder={user.role === 'builder' ? 'e.g. Prestige Group' : 'e.g. Sunrise Realty'}
+                    className={inputCls}
+                  />
+                </div>
+              )}
+              {roleLabels.showLicense && (
+                <div>
+                  <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1">{roleLabels.licenseLabel}</label>
+                  <input
+                    value={agentForm.licenseNumber}
+                    onChange={(e) => setAgentForm((f) => ({ ...f, licenseNumber: e.target.value }))}
+                    placeholder="e.g. RERA12345678"
+                    className={inputCls}
+                  />
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1">Bio</label>
                 <textarea
                   rows={3}
                   value={agentForm.bio}
                   onChange={(e) => setAgentForm((f) => ({ ...f, bio: e.target.value }))}
-                  placeholder="Tell buyers a bit about yourself…"
+                  placeholder={roleLabels.bioPlaceholder}
                   className={inputCls + ' resize-none'}
                 />
               </div>
@@ -467,21 +542,27 @@ const ProfilePage = () => {
           ) : (
             <div className="flex flex-col items-start gap-4">
               <p className="text-sm text-on-surface-variant">
-                Create an agent profile to appear in the agents directory and build buyer trust.
+                {user.role === 'agent'
+                  ? 'Create an agent profile to appear in the agents directory and build buyer trust.'
+                  : user.role === 'builder'
+                  ? 'Add your company profile so buyers can discover your projects.'
+                  : 'Add a short bio so buyers know they are dealing directly with the owner.'}
               </p>
               <button
                 onClick={() => setEditingAgent(true)}
                 className="bg-primary text-white px-6 py-2.5 rounded-xl text-sm font-semibold"
               >
-                Set Up Agent Profile
+                Set Up {roleLabels.section}
               </button>
             </div>
           )}
         </div>
+          );
+        })()}
 
         {/* Tabs */}
         <div className="flex border-b border-outline-variant mb-6">
-          {(['listings', 'saved', 'enquiries'] as Tab[]).map((t) => (
+          {(canPost(user.role) ? ['listings', 'saved', 'enquiries'] : ['saved', 'enquiries'] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -496,12 +577,22 @@ const ProfilePage = () => {
               {t === 'saved'      && `Saved (${savedProperties.length})`}
               {t === 'enquiries'  && (
                 <>
-                  Enquiries
-                  {unread > 0 && (
+                  {canPost(user.role)
+                    ? `Enquiries (${inquiries.length})`
+                    : `My Enquiries (${sentInquiries.length})`}
+                  {canPost(user.role) && unread > 0 && (
                     <span className="ml-1.5 inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-white text-[10px] font-bold">
                       {unread > 99 ? '99+' : unread}
                     </span>
                   )}
+                  {!canPost(user.role) && (() => {
+                    const n = sentInquiries.filter((q) => q.reply_message && !seenReplies.has(q.id)).length;
+                    return n > 0 ? (
+                      <span className="ml-1.5 inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white text-[10px] font-bold">
+                        {n > 99 ? '99+' : n}
+                      </span>
+                    ) : null;
+                  })()}
                 </>
               )}
             </button>
@@ -519,9 +610,11 @@ const ProfilePage = () => {
               <span className="material-symbols-outlined text-outline text-7xl">home</span>
               <h3 className="text-lg font-bold text-on-surface">No listings yet</h3>
               <p className="text-body-md text-on-surface-variant">Properties you post will appear here.</p>
-              <button onClick={() => navigate('/post-property')} className="mt-2 bg-primary text-white px-8 py-3 rounded-xl font-semibold">
-                Post Your First Property
-              </button>
+              {canPost(user.role) && (
+                <button onClick={() => navigate('/post-property')} className="mt-2 bg-primary text-white px-8 py-3 rounded-xl font-semibold">
+                  Post Your First Property
+                </button>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -612,6 +705,143 @@ const ProfilePage = () => {
             <div className="flex justify-center py-20">
               <span className="material-symbols-outlined animate-spin text-primary text-5xl">progress_activity</span>
             </div>
+          ) : !canPost(user.role) ? (
+            /* ── Buyer: sent enquiries + replies ── */
+            sentInquiries.length === 0 ? (
+              <div className="flex flex-col items-center py-20 gap-4 text-center">
+                <span className="material-symbols-outlined text-outline text-7xl">forum</span>
+                <h3 className="text-lg font-bold text-on-surface">No enquiries sent yet</h3>
+                <p className="text-body-md text-on-surface-variant">Enquiries you send on property listings will appear here along with replies.</p>
+                <button onClick={() => navigate('/listings')} className="mt-2 bg-primary text-white px-8 py-3 rounded-xl font-semibold">Browse Properties</button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {sentInquiries.map((q) => {
+                  const isExpanded  = expandedId === q.id;
+                  const thread      = threadMap[q.id];
+                  const hasNewReply = !!(q.reply_message && !seenReplies.has(q.id));
+                  const initials    = (q.property_title ?? 'P')
+                    .split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
+                  return (
+                    <div key={q.id} className={`bg-white rounded-xl border overflow-hidden transition-colors ${hasNewReply ? 'border-blue-400 bg-blue-50' : 'border-gray-100'}`}>
+
+                      {/* Card header — identical structure to agent side */}
+                      <button
+                        className="w-full text-left px-5 pt-4 pb-3 flex items-start justify-between gap-4"
+                        onClick={() => toggleExpand(q.id)}
+                      >
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          {/* Avatar circle */}
+                          <div className="w-10 h-10 rounded-full bg-primary/10 text-primary font-bold text-sm flex items-center justify-center flex-shrink-0">
+                            {q.property_title
+                              ? initials
+                              : <span className="material-symbols-outlined text-[18px]">home</span>
+                            }
+                          </div>
+
+                          <div className="min-w-0">
+                            {/* Title row */}
+                            <p className="text-sm font-bold text-on-surface flex items-center gap-1.5 flex-wrap">
+                              {q.property_title ?? 'Property Enquiry'}
+                              {hasNewReply && (
+                                <>
+                                  <span className="inline-block w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
+                                  <span className="text-[10px] font-bold bg-blue-500 text-white px-1.5 py-0.5 rounded-full">New Reply</span>
+                                </>
+                              )}
+                              {!q.reply_message && (
+                                <span className="text-[10px] font-semibold text-on-surface-variant bg-gray-100 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                                  <span className="material-symbols-outlined text-[10px]">schedule</span>
+                                  Awaiting reply
+                                </span>
+                              )}
+                            </p>
+
+                            {/* Sub-line: city / location */}
+                            {(q.property_city || q.property_location) && (
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <span className="material-symbols-outlined text-[12px] text-on-surface-variant">location_on</span>
+                                <p className="text-xs text-on-surface-variant truncate">
+                                  {[q.property_city, q.property_location].filter(Boolean).join(' · ')}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Message snippet */}
+                            <p className="text-xs text-on-surface-variant mt-0.5 line-clamp-1 italic">"{q.message}"</p>
+                          </div>
+                        </div>
+
+                        {/* Right: time + chevron */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="text-xs text-on-surface-variant">{timeAgo(q.created_at)}</span>
+                          <span className={`material-symbols-outlined text-on-surface-variant text-[20px] transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                            expand_more
+                          </span>
+                        </div>
+                      </button>
+
+                      {/* Expanded thread — identical to agent side */}
+                      {isExpanded && (
+                        <div className="px-5 pb-5 border-t border-gray-100">
+                          <div className="pt-4 space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                            {threadLoading && !thread ? (
+                              <div className="flex justify-center py-6">
+                                <span className="material-symbols-outlined animate-spin text-primary">progress_activity</span>
+                              </div>
+                            ) : (thread ?? []).map((m) => {
+                              const isMine = m.sender_type === 'buyer';
+                              return (
+                                <div key={m.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+                                  <div className={`max-w-[78%] px-4 py-2.5 rounded-2xl ${isMine ? 'bg-primary text-white rounded-br-sm' : 'bg-gray-100 text-on-surface rounded-bl-sm'}`}>
+                                    <p className={`text-[10px] font-semibold mb-1 ${isMine ? 'text-white/70' : 'text-on-surface-variant'}`}>
+                                      {isMine ? 'You' : (m.sender_name ?? 'Agent')} · {timeAgo(m.created_at)}
+                                    </p>
+                                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{m.content}</p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Compose — same footer layout as agent side */}
+                          <div className="pt-4 border-t border-gray-100 mt-4">
+                            <textarea
+                              rows={2}
+                              value={msgDraft}
+                              onChange={(e) => setMsgDraft(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSendMessage(q.id, false); }}
+                              placeholder="Follow up… (Ctrl+Enter to send)"
+                              className="w-full border border-outline-variant rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                            />
+                            {msgErr && <p className="text-xs text-red-600 mt-1">{msgErr}</p>}
+                            <div className="flex items-center justify-between mt-2">
+                              {q.property_id ? (
+                                <button
+                                  onClick={() => navigate(`/property/${q.property_id}`)}
+                                  className="flex items-center gap-1.5 text-xs font-semibold text-on-surface-variant hover:text-primary transition-colors"
+                                >
+                                  <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                                  View Property
+                                </button>
+                              ) : <span />}
+                              <button
+                                onClick={() => handleSendMessage(q.id, false)}
+                                disabled={msgSending}
+                                className="flex items-center gap-1.5 bg-primary text-white px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-50"
+                              >
+                                <span className="material-symbols-outlined text-[16px]">send</span>
+                                {msgSending ? 'Sending…' : 'Send'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )
           ) : inquiries.length === 0 ? (
             <div className="flex flex-col items-center py-20 gap-4 text-center">
               <span className="material-symbols-outlined text-outline text-7xl">mark_email_unread</span>
@@ -620,139 +850,125 @@ const ProfilePage = () => {
             </div>
           ) : (
             <div className="space-y-3">
-              {inquiries.map((q) => (
-                <div
-                  key={q.id}
-                  onClick={() => handleMarkRead(q)}
-                  className={[
-                    'bg-white rounded-xl border p-5 cursor-pointer transition-colors',
-                    q.is_read
-                      ? 'border-gray-100'
-                      : 'border-primary/30 bg-primary/[0.02]',
-                  ].join(' ')}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 text-primary font-bold text-sm flex items-center justify-center flex-shrink-0">
-                        {q.sender_name
-                          ? q.sender_name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
-                          : <span className="material-symbols-outlined text-[18px]">person</span>
-                        }
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-on-surface truncate">
-                          {q.sender_name ?? 'Anonymous'}
-                          {!q.is_read && (
-                            <span className="ml-2 inline-block w-2 h-2 rounded-full bg-primary align-middle" />
-                          )}
-                        </p>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {q.sender_email && (
-                            <a
-                              href={`mailto:${q.sender_email}`}
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-xs text-primary hover:underline"
-                            >
-                              {q.sender_email}
-                            </a>
-                          )}
-                          {q.sender_phone && (
-                            <a
-                              href={`tel:${q.sender_phone}`}
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-xs text-primary hover:underline flex items-center gap-0.5"
-                            >
-                              <span className="material-symbols-outlined text-[12px]">call</span>
-                              {q.sender_phone}
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <span className="text-xs text-on-surface-variant whitespace-nowrap flex-shrink-0">
-                      {timeAgo(q.created_at)}
-                    </span>
-                  </div>
-
-                  {q.property_title && (
+              {inquiries.map((q) => {
+                const isExpanded = expandedId === q.id;
+                const thread     = threadMap[q.id];
+                return (
+                  <div
+                    key={q.id}
+                    className={`bg-white rounded-xl border overflow-hidden transition-colors ${q.is_read ? 'border-gray-100' : 'border-blue-400 bg-blue-50'}`}
+                  >
+                    {/* Card header */}
                     <button
-                      onClick={(e) => { e.stopPropagation(); navigate(`/property/${q.property_id}`); }}
-                      className="mt-3 flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-primary transition-colors"
+                      className="w-full text-left px-5 pt-4 pb-3 flex items-start justify-between gap-4"
+                      onClick={() => toggleExpand(q.id, q)}
                     >
-                      <span className="material-symbols-outlined text-[14px]">home</span>
-                      <span className="truncate">{q.property_title}</span>
-                      {q.property_city && <span>· {q.property_city}</span>}
-                    </button>
-                  )}
-
-                  <p className="mt-3 text-sm text-on-surface leading-relaxed line-clamp-3">
-                    {q.message}
-                  </p>
-
-                  {/* Reply section */}
-                  <div className="mt-3 pt-3 border-t border-gray-100" onClick={(e) => e.stopPropagation()}>
-                    {q.reply_message ? (
-                      <div className="bg-primary/5 border border-primary/15 rounded-xl p-3">
-                        <div className="flex items-center gap-1.5 mb-1.5">
-                          <span className="material-symbols-outlined text-[14px] text-primary">reply</span>
-                          <span className="text-xs font-bold text-primary">Your reply</span>
-                          {q.replied_at && (
-                            <span className="text-xs text-on-surface-variant ml-auto">{timeAgo(q.replied_at)}</span>
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 text-primary font-bold text-sm flex items-center justify-center flex-shrink-0">
+                          {q.sender_name
+                            ? q.sender_name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
+                            : <span className="material-symbols-outlined text-[18px]">person</span>
+                          }
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-on-surface flex items-center gap-1.5">
+                            {q.sender_name ?? 'Anonymous'}
+                            {!q.is_read && (
+                              <>
+                                <span className="inline-block w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
+                                <span className="text-[10px] font-bold bg-blue-500 text-white px-1.5 py-0.5 rounded-full">New</span>
+                              </>
+                            )}
+                          </p>
+                          <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                            {q.sender_email && (
+                              <a href={`mailto:${q.sender_email}`} onClick={(e) => e.stopPropagation()} className="text-xs text-primary hover:underline">
+                                {q.sender_email}
+                              </a>
+                            )}
+                            {q.sender_phone && (
+                              <a href={`tel:${q.sender_phone}`} onClick={(e) => e.stopPropagation()} className="text-xs text-primary hover:underline flex items-center gap-0.5">
+                                <span className="material-symbols-outlined text-[12px]">call</span>
+                                {q.sender_phone}
+                              </a>
+                            )}
+                          </div>
+                          {q.property_title && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); navigate(`/property/${q.property_id}`); }}
+                              className="mt-1 flex items-center gap-1 text-xs text-on-surface-variant hover:text-primary"
+                            >
+                              <span className="material-symbols-outlined text-[13px]">home</span>
+                              <span className="truncate">{q.property_title}{q.property_city ? ` · ${q.property_city}` : ''}</span>
+                            </button>
                           )}
                         </div>
-                        <p className="text-sm text-on-surface leading-relaxed">{q.reply_message}</p>
                       </div>
-                    ) : replyingToId === q.id ? (
-                      <div className="space-y-2">
-                        <textarea
-                          autoFocus
-                          rows={3}
-                          value={replyDraft}
-                          onChange={(e) => setReplyDraft(e.target.value)}
-                          placeholder="Type your reply…"
-                          className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                        />
-                        {replyErr && <p className="text-xs text-red-600">{replyErr}</p>}
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleReply(q)}
-                            disabled={replySending}
-                            className="flex items-center gap-1.5 bg-primary text-white px-4 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50"
-                          >
-                            <span className="material-symbols-outlined text-[14px]">send</span>
-                            {replySending ? 'Sending…' : 'Send Reply'}
-                          </button>
-                          <button
-                            onClick={() => setReplyingToId(null)}
-                            className="text-xs font-semibold text-on-surface-variant px-3 hover:text-on-surface"
-                          >
-                            Cancel
-                          </button>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-xs text-on-surface-variant">{timeAgo(q.created_at)}</span>
+                        <span className={`material-symbols-outlined text-on-surface-variant text-[20px] transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                          expand_more
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* Expanded thread */}
+                    {isExpanded && (
+                      <div className="px-5 pb-5 border-t border-gray-100">
+                        <div className="pt-4 space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                          {threadLoading && !thread ? (
+                            <div className="flex justify-center py-6">
+                              <span className="material-symbols-outlined animate-spin text-primary">progress_activity</span>
+                            </div>
+                          ) : (thread ?? []).map((m) => {
+                            const isMine = m.sender_type === 'agent';
+                            return (
+                              <div key={m.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[78%] px-4 py-2.5 rounded-2xl ${isMine ? 'bg-primary text-white rounded-br-sm' : 'bg-gray-100 text-on-surface rounded-bl-sm'}`}>
+                                  <p className={`text-[10px] font-semibold mb-1 ${isMine ? 'text-white/70' : 'text-on-surface-variant'}`}>
+                                    {isMine ? 'You' : (m.sender_name ?? 'Buyer')} · {timeAgo(m.created_at)}
+                                  </p>
+                                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{m.content}</p>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <button
-                          onClick={() => openReply(q.id)}
-                          className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
-                        >
-                          <span className="material-symbols-outlined text-[14px]">reply</span>
-                          Reply
-                        </button>
-                        {q.sender_phone && (
-                          <a
-                            href={`tel:${q.sender_phone}`}
-                            className="flex items-center gap-1.5 text-xs font-semibold text-on-surface-variant hover:text-primary"
-                          >
-                            <span className="material-symbols-outlined text-[14px]">call</span>
-                            Call Back
-                          </a>
-                        )}
+
+                        {/* Compose */}
+                        <div className="pt-4 border-t border-gray-100 mt-4">
+                          <textarea
+                            autoFocus
+                            rows={2}
+                            value={msgDraft}
+                            onChange={(e) => setMsgDraft(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSendMessage(q.id, true); }}
+                            placeholder="Reply… (Ctrl+Enter to send)"
+                            className="w-full border border-outline-variant rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                          />
+                          {msgErr && <p className="text-xs text-red-600 mt-1">{msgErr}</p>}
+                          <div className="flex items-center justify-between mt-2">
+                            {q.sender_phone ? (
+                              <a href={`tel:${q.sender_phone}`} className="flex items-center gap-1.5 text-xs font-semibold text-on-surface-variant hover:text-primary">
+                                <span className="material-symbols-outlined text-[14px]">call</span>
+                                Call Back
+                              </a>
+                            ) : <span />}
+                            <button
+                              onClick={() => handleSendMessage(q.id, true)}
+                              disabled={msgSending}
+                              className="flex items-center gap-1.5 bg-primary text-white px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-50"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">send</span>
+                              {msgSending ? 'Sending…' : 'Send Reply'}
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )
         )}

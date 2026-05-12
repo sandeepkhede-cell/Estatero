@@ -10,7 +10,7 @@ import {
   sendPropertyEnquiry,
   recordView,
 } from '../controllers/propertyController';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requireRole } from '../middleware/auth';
 
 const router = Router();
 
@@ -19,7 +19,7 @@ router.get('/search', searchProperties);
 router.get('/',      getProperties);
 router.get('/:id',   getPropertyById);
 
-router.post('/',           requireAuth, createProperty);
+router.post('/',           requireAuth, requireRole('agent', 'owner', 'builder'), createProperty);
 router.post('/:id/enquiry', sendPropertyEnquiry);
 router.post('/:id/view',   recordView);
 router.put('/:id',         requireAuth, updateProperty);
