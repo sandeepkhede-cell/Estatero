@@ -38,6 +38,17 @@ const DetailPage = () => {
     if (id) propertyService.recordView(id).catch(() => {});
   }, [id]);
 
+  useEffect(() => {
+    if (!property) return;
+    try {
+      const prev: { id: number; title: string; location: string; price: number; viewedAt: string }[] =
+        JSON.parse(localStorage.getItem('estatero_viewed') ?? '[]');
+      const filtered = prev.filter((v) => v.id !== property.id).slice(0, 49);
+      filtered.unshift({ id: Number(property.id), title: property.title, location: property.location, price: property.price, viewedAt: new Date().toISOString() });
+      localStorage.setItem('estatero_viewed', JSON.stringify(filtered));
+    } catch { /* noop */ }
+  }, [property?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (loading || !property) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center bg-surface-bright">
@@ -118,6 +129,24 @@ const DetailPage = () => {
               pricePerSqft={property.pricePerSqft}
               hidePriceOnDesktop
             />
+
+            {/* Property badges row — project / owner-direct */}
+            {(property.projectName || property.isOwnerDirect) && (
+              <div className="flex flex-wrap items-center gap-2 mt-3 mb-1">
+                {property.projectName && (
+                  <span className="inline-flex items-center gap-1.5 bg-primary/8 text-primary border border-primary/20 rounded-full px-3 py-1 text-xs font-semibold">
+                    <span className="material-symbols-outlined text-[14px]">domain</span>
+                    Part of {property.projectName}
+                  </span>
+                )}
+                {property.isOwnerDirect && (
+                  <span className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-3 py-1 text-xs font-semibold">
+                    <span className="material-symbols-outlined text-[14px]">handshake</span>
+                    Owner Direct
+                  </span>
+                )}
+              </div>
+            )}
 
             <PropertyStatGrid stats={stats} />
 

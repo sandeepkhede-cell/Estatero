@@ -4,6 +4,7 @@ import { formatINR } from '../../../utils/formatINR';
 interface Props {
   form: PostPropertyForm;
   onChange: (patch: Partial<PostPropertyForm>) => void;
+  userRole?: string;
 }
 
 const inputCls = 'w-full border border-outline-variant rounded-lg px-4 py-3 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white';
@@ -18,7 +19,31 @@ const Field = ({ label, hint, children }: { label: string; hint?: string; childr
   </div>
 );
 
-const Step4Pricing = ({ form, onChange }: Props) => {
+function Toggle({ label, description, value, onToggle }: { label: string; description: string; value: boolean; onToggle: () => void }) {
+  return (
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-sm font-semibold text-on-surface">{label}</p>
+        <p className="text-xs text-on-surface-variant mt-0.5">{description}</p>
+      </div>
+      <button
+        type="button"
+        onClick={onToggle}
+        className={[
+          'relative w-11 h-6 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
+          value ? 'bg-primary' : 'bg-surface-container-high',
+        ].join(' ')}
+      >
+        <span className={[
+          'absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform',
+          value ? 'translate-x-5' : '',
+        ].join(' ')} />
+      </button>
+    </div>
+  );
+}
+
+const Step4Pricing = ({ form, onChange, userRole }: Props) => {
   const price = Number(form.price) || 0;
   const area  = Number(form.area_sqft) || 0;
   const autoPerSqft = area > 0 && price > 0 ? Math.round(price / area) : 0;
@@ -73,25 +98,12 @@ const Step4Pricing = ({ form, onChange }: Props) => {
       </div>
 
       <div className="border border-outline-variant rounded-xl p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold text-on-surface">RERA Registered</p>
-            <p className="text-xs text-on-surface-variant mt-0.5">Builds buyer trust and is legally required in many states</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => onChange({ rera_registered: !form.rera_registered })}
-            className={[
-              'relative w-11 h-6 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
-              form.rera_registered ? 'bg-primary' : 'bg-surface-container-high',
-            ].join(' ')}
-          >
-            <span className={[
-              'absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform',
-              form.rera_registered ? 'translate-x-5' : '',
-            ].join(' ')} />
-          </button>
-        </div>
+        <Toggle
+          label="RERA Registered"
+          description="Builds buyer trust and is legally required in many states"
+          value={form.rera_registered}
+          onToggle={() => onChange({ rera_registered: !form.rera_registered })}
+        />
 
         {form.rera_registered && (
           <Field label="RERA Number">
@@ -103,6 +115,19 @@ const Step4Pricing = ({ form, onChange }: Props) => {
               className={inputCls}
             />
           </Field>
+        )}
+
+        {/* Owner Direct — only for owner role */}
+        {userRole === 'owner' && (
+          <>
+            <div className="border-t border-outline-variant pt-4" />
+            <Toggle
+              label="Owner Direct"
+              description="No broker or agent involved — buyers contact you directly"
+              value={form.is_owner_direct}
+              onToggle={() => onChange({ is_owner_direct: !form.is_owner_direct })}
+            />
+          </>
         )}
       </div>
     </div>

@@ -95,10 +95,18 @@ export async function getMyAgentProfile(req: AuthRequest, res: Response, next: N
   }
 }
 
+const RERA_RE = /^RERA[A-Z0-9]{5,20}$/i;
+
 export async function updateMyAgentProfile(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { agencyName, bio, licenseNumber, profileImage } =
       req.body as agentModel.UpdateAgentProfileInput;
+
+    if (licenseNumber?.trim() && !RERA_RE.test(licenseNumber.trim())) {
+      res.status(400).json({ error: 'License number must start with RERA followed by 5–20 alphanumeric characters (e.g. RERAMH12345)' });
+      return;
+    }
+
     const profile = await agentModel.upsertAgentProfile(req.user!.userId, {
       agencyName:    agencyName    ?? null,
       bio:           bio           ?? null,

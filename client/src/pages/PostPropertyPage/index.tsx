@@ -6,6 +6,7 @@ import { PostPropertyForm, EMPTY_FORM, STEPS, generateTitle } from './types';
 import StepIndicator from './StepIndicator';
 import Step1Type      from './steps/Step1Type';
 import Step2Location  from './steps/Step2Location';
+import StepProject    from './steps/StepProject';
 import Step3Details   from './steps/Step3Details';
 import Step4Pricing   from './steps/Step4Pricing';
 import Step5Amenities from './steps/Step5Amenities';
@@ -70,6 +71,8 @@ function toPayload(form: PostPropertyForm): Record<string, unknown> {
     facing:          form.facing || undefined,
     rera_registered: form.rera_registered,
     rera_number:     form.rera_number || undefined,
+    is_owner_direct: form.is_owner_direct || undefined,
+    project_id:      form.projectId ?? undefined,
     imageUrls:       form.imageUrls.length > 0 ? form.imageUrls : undefined,
     amenities:       form.amenities.length > 0
                        ? form.amenities.map((label) => ({ icon: AMENITY_ICONS[label] ?? '', label }))
@@ -83,6 +86,7 @@ const PostPropertyPage = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { open: openAuthModal }        = useAuthModal();
+  const isBuilder = user?.role === 'builder';
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -102,14 +106,14 @@ const PostPropertyPage = () => {
     setFieldError(null);
   };
 
-  const handleNext = () => {
+  const handleNext = (totalSteps: number) => {
     const err = validate(step, form);
     if (err) { setFieldError(err); return; }
-    if (step === STEPS.length - 1) {
+    if (step === totalSteps - 1) {
       handleSubmit();
     } else {
       // Auto-fill title when entering review step
-      if (step === STEPS.length - 2 && !form.title) {
+      if (step === totalSteps - 2 && !form.title) {
         setForm((prev) => ({ ...prev, title: generateTitle(prev) }));
       }
       setStep((s) => s + 1);
@@ -130,17 +134,34 @@ const PostPropertyPage = () => {
     }
   };
 
-  const stepComponents = [
-    <Step1Type      form={form} onChange={patch} />,
-    <Step2Location  form={form} onChange={patch} />,
-    <Step3Details   form={form} onChange={patch} />,
-    <Step4Pricing   form={form} onChange={patch} />,
-    <Step5Amenities form={form} onChange={patch} />,
-    <Step6Photos    form={form} onChange={patch} />,
-    <Step7Review    form={form} onChange={patch} submitting={submitting} error={submitError} />,
-  ];
+  // Build the step list dynamically based on role
+  // Builders get an extra "Project" step between Location and Details
+  const stepLabels = isBuilder
+    ? ['Property Type', 'Location', 'Project', 'Details', 'Pricing', 'Amenities', 'Photos', 'Review']
+    : [...STEPS];
 
-  const isLastStep = step === STEPS.length - 1;
+  const stepComponents = isBuilder
+    ? [
+        <Step1Type      form={form} onChange={patch} />,
+        <Step2Location  form={form} onChange={patch} />,
+        <StepProject    form={form} onChange={patch} />,
+        <Step3Details   form={form} onChange={patch} />,
+        <Step4Pricing   form={form} onChange={patch} userRole={user.role} />,
+        <Step5Amenities form={form} onChange={patch} />,
+        <Step6Photos    form={form} onChange={patch} />,
+        <Step7Review    form={form} onChange={patch} submitting={submitting} error={submitError} />,
+      ]
+    : [
+        <Step1Type      form={form} onChange={patch} />,
+        <Step2Location  form={form} onChange={patch} />,
+        <Step3Details   form={form} onChange={patch} />,
+        <Step4Pricing   form={form} onChange={patch} userRole={user?.role} />,
+        <Step5Amenities form={form} onChange={patch} />,
+        <Step6Photos    form={form} onChange={patch} />,
+        <Step7Review    form={form} onChange={patch} submitting={submitting} error={submitError} />,
+      ];
+
+  const isLastStep = step === stepComponents.length - 1;
 
   if (authLoading || !user) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -160,12 +181,12 @@ const PostPropertyPage = () => {
 
         {/* Step indicator */}
         <div className="mb-8">
-          <StepIndicator current={step} />
+          <StepIndicator current={step} total={stepComponents.length} />
         </div>
 
         {/* Step card */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
-          <h2 className="text-lg font-bold text-on-surface mb-6">{STEPS[step]}</h2>
+          <h2 className="text-lg font-bold text-on-surface mb-6">{stepLabels[step]}</h2>
           {stepComponents[step]}
 
           {fieldError && (
@@ -189,11 +210,11 @@ const PostPropertyPage = () => {
 
           <div className="flex items-center gap-3">
             <span className="text-xs text-outline">
-              Step {step + 1} of {STEPS.length}
+              Step {step + 1} of {stepComponents.length}
             </span>
             <button
               type="button"
-              onClick={handleNext}
+              onClick={() => handleNext(stepComponents.length)}
               disabled={submitting}
               className="flex items-center gap-2 bg-primary hover:bg-primary-container text-white font-semibold px-6 py-3 rounded-xl transition-colors disabled:opacity-50"
             >

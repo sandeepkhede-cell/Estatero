@@ -29,17 +29,20 @@ export interface NearbyPlace {
 }
 
 export interface Agent {
-  id:             string | number;
-  name:           string;
-  role:           'owner' | 'agent' | 'builder' | string;
-  tagline?:       string;
-  avatar:         string;
-  phone?:         string;
-  email?:         string;
-  totalListings?: number;
-  bio?:           string;
-  rating?:        number;
-  listingsCount?: number;
+  id:               string | number;
+  name:             string;
+  role:             'owner' | 'agent' | 'builder' | string;
+  tagline?:         string;
+  avatar:           string;
+  phone?:           string;
+  email?:           string;
+  totalListings?:   number;
+  bio?:             string;
+  rating?:          number;
+  listingsCount?:   number;
+  isVerified?:      boolean;
+  responseRate?:    number;
+  avgResponseHours?: number;
 }
 
 // ── Core entity ────────────────────────────────────────────────────────────────
@@ -84,11 +87,19 @@ export interface Property {
   isVerified?:     boolean;
   isFavourited?:   boolean;
   isFeatured?:     boolean;
+  isOwnerDirect?:  boolean;
   isReraRegistered?: boolean;
   reraNumber?:     string;
 
   // Engagement
   viewCount?:      number;
+
+  // Project (builder)
+  projectId?:      number;
+  projectName?:    string;
+
+  // Price-drop alert (set when saved)
+  priceAtSave?:    number;
 
   // Display extras
   badge?:          string;

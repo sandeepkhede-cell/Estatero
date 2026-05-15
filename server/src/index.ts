@@ -5,14 +5,17 @@ import compression from 'compression';
 import dotenv from 'dotenv';
 import path from 'path';
 
-import propertyRoutes  from './routes/properties';
-import searchRoutes    from './routes/search';
-import agentRoutes     from './routes/agents';
-import authRoutes      from './routes/auth';
-import userRoutes      from './routes/users';
-import uploadRoutes    from './routes/upload';
-import inquiryRoutes   from './routes/inquiries';
-import favouriteRoutes from './routes/favourites';
+import propertyRoutes     from './routes/properties';
+import searchRoutes        from './routes/search';
+import agentRoutes         from './routes/agents';
+import authRoutes          from './routes/auth';
+import userRoutes          from './routes/users';
+import uploadRoutes        from './routes/upload';
+import inquiryRoutes       from './routes/inquiries';
+import favouriteRoutes     from './routes/favourites';
+import analyticsRoutes     from './routes/analytics';
+import savedSearchRoutes   from './routes/savedSearches';
+import projectRoutes       from './routes/projects';
 import { notFound, errorHandler } from './middleware/errorHandler';
 
 dotenv.config();
@@ -36,14 +39,17 @@ app.use('/uploads',
 );
 
 // ── Routes ────────────────────────────────────────────────────────────────────
-app.use('/api/upload',     uploadRoutes);
-app.use('/api/auth',       authRoutes);
-app.use('/api/properties', propertyRoutes);
-app.use('/api/search',     searchRoutes);
-app.use('/api/agents',     agentRoutes);
-app.use('/api/users',      userRoutes);
-app.use('/api/inquiries',  inquiryRoutes);
-app.use('/api/favourites', favouriteRoutes);
+app.use('/api/upload',         uploadRoutes);
+app.use('/api/auth',           authRoutes);
+app.use('/api/properties',     propertyRoutes);
+app.use('/api/search',         searchRoutes);
+app.use('/api/agents',         agentRoutes);
+app.use('/api/users',          userRoutes);
+app.use('/api/inquiries',      inquiryRoutes);
+app.use('/api/favourites',     favouriteRoutes);
+app.use('/api/analytics',      analyticsRoutes);
+app.use('/api/saved-searches', savedSearchRoutes);
+app.use('/api/projects',       projectRoutes);
 
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));

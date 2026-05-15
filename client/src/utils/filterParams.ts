@@ -35,7 +35,8 @@ export function filtersToParams(filters: FilterState): URLSearchParams {
   if (filters.availability)  p.set('availability',  filters.availability);
   if (filters.ageOfProperty) p.set('age',           filters.ageOfProperty);
   filters.amenities?.forEach((a) => p.append('amenity', a));
-  if (filters.postedBy) p.set('postedBy', filters.postedBy);
+  if (filters.postedBy)    p.set('postedBy', filters.postedBy);
+  if (filters.ownerDirect) p.set('ownerDirect', 'true');
 
   if (filters.page && filters.page > 1) p.set('page', String(filters.page));
 
@@ -105,6 +106,8 @@ export function paramsToFilters(params: URLSearchParams): Partial<FilterState> {
   const postedBy = params.get('postedBy');
   if (postedBy === 'owner' || postedBy === 'agent' || postedBy === 'builder')
     out.postedBy = postedBy;
+
+  if (params.get('ownerDirect') === 'true') out.ownerDirect = true;
 
   const page = params.get('page');
   if (page !== null) out.page = Math.max(1, Number(page));

@@ -21,6 +21,8 @@ export async function getProperties(req: Request, res: Response, next: NextFunct
       availability:  req.query.availability  as string,
       ageOfProperty: req.query.ageOfProperty as string,
       postedBy:      req.query.postedBy      as string,
+      ownerDirect:   req.query.ownerDirect === 'true' ? true : undefined,
+      reraOnly:      req.query.reraOnly === 'true' ? true : undefined,
       sortBy:        req.query.sortBy        as PropertyFilters['sortBy'],
       q:             req.query.q             as string,
       page:          req.query.page          ? Number(req.query.page) : 1,
@@ -91,6 +93,11 @@ export async function createProperty(req: AuthRequest, res: Response, next: Next
       return;
     }
 
+    const { rows: userRows } = await pool.query<{ role: string }>(
+      `SELECT role FROM users WHERE id = $1`, [req.user!.userId]
+    );
+    const userRole = userRows[0]?.role;
+
     // Find or create agent record for the authenticated user, then link it to the property
     const { rows } = await pool.query<{ id: number }>(
       `INSERT INTO agents (user_id) VALUES ($1)
@@ -99,6 +106,9 @@ export async function createProperty(req: AuthRequest, res: Response, next: Next
       [req.user!.userId],
     );
     input.agent_id = rows[0].id;
+
+    // Auto-flag owner-direct for owner role
+    if (userRole === 'owner') input.is_owner_direct = true;
 
     const property = await propertyModel.createProperty(input);
     res.status(201).json(property);

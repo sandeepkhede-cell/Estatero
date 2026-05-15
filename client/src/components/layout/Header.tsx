@@ -18,7 +18,7 @@ interface HeaderProps {
 const defaultNavLinks: NavLink[] = [
   { label: 'Buy',        to: '/listings' },
   { label: 'Rent',       to: '/listings?type=for_rent' },
-  { label: 'Commercial', to: '/listings?pt=commercial' },
+  // { label: 'Commercial', to: '/listings?pt=commercial' },
   { label: 'PG',         to: '/listings?type=pg' },
   { label: 'Find Agent', to: '/agents' },
 ];

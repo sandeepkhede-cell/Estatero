@@ -11,6 +11,7 @@ function toDTO(row: AgentRow): AgentDTO {
     bio:           row.bio ?? undefined,
     rating:        parseFloat(row.rating),
     listingsCount: row.listings_count,
+    isVerified:    row.is_verified,
   };
 }
 
@@ -25,39 +26,59 @@ export async function findAllAgents(search?: string): Promise<AgentDTO[]> {
 
   const { rows } = await pool.query<AgentRow>(
     `SELECT ag.id, ag.user_id, ag.agency_name, ag.license_number,
-            ag.bio, ag.profile_image, ag.rating, ag.listings_count,
+            ag.bio, ag.profile_image, ag.rating, ag.listings_count, ag.is_verified,
             u.name, u.phone
      FROM agents ag
      JOIN users u ON u.id = ag.user_id
      ${where}
-     ORDER BY ag.listings_count DESC, ag.rating DESC`,
+     ORDER BY ag.is_verified DESC, ag.listings_count DESC, ag.rating DESC`,
     values,
   );
   return rows.map(toDTO);
 }
 
 export async function findAgentById(id: number): Promise<AgentDTO | null> {
-  const { rows } = await pool.query<AgentRow>(
+  const { rows } = await pool.query<AgentRow & { response_rate: number; avg_response_hours: number }>(
     `SELECT
        ag.id, ag.user_id, ag.agency_name, ag.license_number,
-       ag.bio, ag.profile_image, ag.rating, ag.listings_count,
-       u.name, u.phone
+       ag.bio, ag.profile_image, ag.rating, ag.listings_count, ag.is_verified,
+       u.name, u.phone,
+       ROUND(
+         100.0 * COUNT(i.replied_at) FILTER (WHERE i.replied_at IS NOT NULL)
+         / NULLIF(COUNT(i.id), 0)
+       ) AS response_rate,
+       ROUND(
+         AVG(EXTRACT(EPOCH FROM (i.replied_at - i.created_at)) / 3600.0)
+         FILTER (WHERE i.replied_at IS NOT NULL)
+       ) AS avg_response_hours
      FROM agents ag
      JOIN users u ON u.id = ag.user_id
-     WHERE ag.id = $1`,
+     LEFT JOIN properties p ON p.agent_id = ag.id
+     LEFT JOIN inquiries  i ON i.property_id = p.id
+     WHERE ag.id = $1
+     GROUP BY ag.id, u.name, u.phone`,
     [id]
   );
-  return rows[0] ? toDTO(rows[0]) : null;
+  if (!rows[0]) return null;
+  const row = rows[0];
+  return {
+    ...toDTO(row),
+    responseRate:      row.response_rate     ? Number(row.response_rate)     : undefined,
+    avgResponseHours:  row.avg_response_hours ? Number(row.avg_response_hours) : undefined,
+  };
 }
 
 export interface AgentProfileDTO {
-  id:            number;
-  agencyName:    string | null;
-  bio:           string | null;
-  licenseNumber: string | null;
-  profileImage:  string | null;
-  rating:        number;
-  listingsCount: number;
+  id:               number;
+  agencyName:       string | null;
+  bio:              string | null;
+  licenseNumber:    string | null;
+  profileImage:     string | null;
+  rating:           number;
+  listingsCount:    number;
+  isVerified:       boolean;
+  responseRate?:    number;
+  avgResponseHours?: number;
 }
 
 export interface UpdateAgentProfileInput {
@@ -71,10 +92,24 @@ export async function findAgentByUserId(userId: number): Promise<AgentProfileDTO
   const { rows } = await pool.query<{
     id: number; agency_name: string | null; bio: string | null;
     license_number: string | null; profile_image: string | null;
-    rating: string; listings_count: number;
+    rating: string; listings_count: number; is_verified: boolean;
+    response_rate: string | null; avg_response_hours: string | null;
   }>(
-    `SELECT id, agency_name, bio, license_number, profile_image, rating, listings_count
-     FROM agents WHERE user_id = $1`,
+    `SELECT ag.id, ag.agency_name, ag.bio, ag.license_number, ag.profile_image,
+            ag.rating, ag.listings_count, ag.is_verified,
+            ROUND(
+              100.0 * COUNT(i.replied_at) FILTER (WHERE i.replied_at IS NOT NULL)
+              / NULLIF(COUNT(i.id), 0)
+            ) AS response_rate,
+            ROUND(
+              AVG(EXTRACT(EPOCH FROM (i.replied_at - i.created_at)) / 3600.0)
+              FILTER (WHERE i.replied_at IS NOT NULL)
+            ) AS avg_response_hours
+     FROM agents ag
+     LEFT JOIN properties p ON p.agent_id = ag.id
+     LEFT JOIN inquiries  i ON i.property_id = p.id
+     WHERE ag.user_id = $1
+     GROUP BY ag.id`,
     [userId],
   );
   if (!rows[0]) return null;
@@ -83,6 +118,9 @@ export async function findAgentByUserId(userId: number): Promise<AgentProfileDTO
     id: r.id, agencyName: r.agency_name, bio: r.bio,
     licenseNumber: r.license_number, profileImage: r.profile_image,
     rating: parseFloat(r.rating), listingsCount: r.listings_count,
+    isVerified: r.is_verified,
+    responseRate:     r.response_rate      ? Number(r.response_rate)      : undefined,
+    avgResponseHours: r.avg_response_hours ? Number(r.avg_response_hours) : undefined,
   };
 }
 
@@ -90,7 +128,7 @@ export async function upsertAgentProfile(userId: number, input: UpdateAgentProfi
   const { rows } = await pool.query<{
     id: number; agency_name: string | null; bio: string | null;
     license_number: string | null; profile_image: string | null;
-    rating: string; listings_count: number;
+    rating: string; listings_count: number; is_verified: boolean;
   }>(
     `INSERT INTO agents (user_id, agency_name, bio, license_number, profile_image)
      VALUES ($1, $2, $3, $4, $5)
@@ -99,7 +137,7 @@ export async function upsertAgentProfile(userId: number, input: UpdateAgentProfi
        bio            = EXCLUDED.bio,
        license_number = EXCLUDED.license_number,
        profile_image  = EXCLUDED.profile_image
-     RETURNING id, agency_name, bio, license_number, profile_image, rating, listings_count`,
+     RETURNING id, agency_name, bio, license_number, profile_image, rating, listings_count, is_verified`,
     [userId, input.agencyName ?? null, input.bio ?? null, input.licenseNumber ?? null, input.profileImage ?? null],
   );
   const r = rows[0];
@@ -107,6 +145,7 @@ export async function upsertAgentProfile(userId: number, input: UpdateAgentProfi
     id: r.id, agencyName: r.agency_name, bio: r.bio,
     licenseNumber: r.license_number, profileImage: r.profile_image,
     rating: parseFloat(r.rating), listingsCount: r.listings_count,
+    isVerified: r.is_verified,
   };
 }
 

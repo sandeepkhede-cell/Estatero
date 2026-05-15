@@ -24,6 +24,7 @@ function toDTO(row: PropertyRow): PropertyDTO {
     badge:        row.badge ?? undefined,
     badgeVariant: (row.badge_variant as 'primary' | 'secondary') ?? 'primary',
     isVerified:      row.is_verified,
+    isOwnerDirect:   row.is_owner_direct,
     listingType:     row.status === 'for_sale' ? 'For Sale'
                    : row.status === 'for_rent' ? 'For Rent'
                    : 'PG',
@@ -37,16 +38,19 @@ function toDTO(row: PropertyRow): PropertyDTO {
     isReraRegistered: row.rera_registered,
     reraNumber:      row.rera_number   ?? undefined,
     viewCount:       row.view_count    ?? 0,
+    projectId:       row.project_id    ?? undefined,
+    projectName:     row.project_name  ?? undefined,
     meta,
     amenities:    row.amenities ?? undefined,
     nearbyPlaces: row.nearby_places ?? undefined,
     agent: row.agent_name ? {
-      id:      row.agent_id!,
-      name:    row.agent_name,
-      role:    row.agent_role ?? 'agent',
-      tagline: row.agent_bio ?? undefined,
-      avatar:  row.agent_avatar ?? '',
-      phone:   row.agent_phone ?? undefined,
+      id:          row.agent_id!,
+      name:        row.agent_name,
+      role:        row.agent_role ?? 'agent',
+      tagline:     row.agent_bio ?? undefined,
+      avatar:      row.agent_avatar ?? '',
+      phone:       row.agent_phone ?? undefined,
+      isVerified:  row.agent_is_verified ?? false,
     } : undefined,
   };
 }
@@ -60,11 +64,13 @@ const BASE_SELECT = `
       ARRAY_AGG(pi.url ORDER BY pi.sort_order) FILTER (WHERE pi.url IS NOT NULL),
       '{}'
     ) AS images,
-    u.name           AS agent_name,
-    u.phone          AS agent_phone,
-    u.role           AS agent_role,
-    ag.bio           AS agent_bio,
-    ag.profile_image AS agent_avatar,
+    u.name             AS agent_name,
+    u.phone            AS agent_phone,
+    u.role             AS agent_role,
+    ag.bio             AS agent_bio,
+    ag.profile_image   AS agent_avatar,
+    ag.is_verified     AS agent_is_verified,
+    pr.name            AS project_name,
     COALESCE(
       JSON_AGG(DISTINCT jsonb_build_object('icon', am.icon, 'label', am.label))
         FILTER (WHERE am.id IS NOT NULL),
@@ -79,6 +85,7 @@ const BASE_SELECT = `
   LEFT JOIN property_images   pi ON pi.property_id = p.id
   LEFT JOIN agents            ag ON ag.id = p.agent_id
   LEFT JOIN users             u  ON u.id  = ag.user_id
+  LEFT JOIN projects          pr ON pr.id = p.project_id
   LEFT JOIN property_amenities pa ON pa.property_id = p.id
   LEFT JOIN amenities         am ON am.id = pa.amenity_id
   LEFT JOIN nearby_places     np ON np.property_id = p.id
@@ -163,6 +170,12 @@ export async function findProperties(filters: PropertyFilters): Promise<Property
     conditions.push(`u.role = $${i++}`);
     params.push(filters.postedBy);
   }
+  if (filters.ownerDirect) {
+    conditions.push(`p.is_owner_direct = TRUE`);
+  }
+  if (filters.reraOnly) {
+    conditions.push(`p.rera_registered = TRUE`);
+  }
   if (filters.q) {
     conditions.push(
       `to_tsvector('english', p.title || ' ' || p.location || ' ' || p.city)
@@ -182,7 +195,7 @@ export async function findProperties(filters: PropertyFilters): Promise<Property
   const dataSQL = `
     ${BASE_SELECT}
     ${WHERE}
-    GROUP BY p.id, u.name, u.phone, u.role, ag.bio, ag.profile_image
+    GROUP BY p.id, u.name, u.phone, u.role, ag.bio, ag.profile_image, ag.is_verified, pr.name, ag.is_verified, pr.name
     ORDER BY ${ORDER}
     LIMIT $${i++} OFFSET $${i++}
   `;
@@ -191,8 +204,9 @@ export async function findProperties(filters: PropertyFilters): Promise<Property
   const countSQL = `
     SELECT COUNT(DISTINCT p.id)
     FROM properties p
-    LEFT JOIN agents ag ON ag.id = p.agent_id
-    LEFT JOIN users  u  ON u.id  = ag.user_id
+    LEFT JOIN agents   ag ON ag.id = p.agent_id
+    LEFT JOIN users    u  ON u.id  = ag.user_id
+    LEFT JOIN projects pr ON pr.id = p.project_id
     ${WHERE}
   `;
 
@@ -216,7 +230,7 @@ export async function findPropertyById(id: number): Promise<PropertyDTO | null> 
   const { rows } = await pool.query<PropertyRow>(
     `${BASE_SELECT}
      WHERE p.id = $1
-     GROUP BY p.id, u.name, u.phone, u.role, ag.bio, ag.profile_image`,
+     GROUP BY p.id, u.name, u.phone, u.role, ag.bio, ag.profile_image, ag.is_verified, pr.name`,
     [id]
   );
   return rows[0] ? toDTO(rows[0]) : null;
@@ -233,7 +247,7 @@ export async function findFeaturedProperties(): Promise<PropertyDTO[]> {
   const { rows } = await pool.query<PropertyRow>(
     `${BASE_SELECT}
      WHERE p.is_featured = TRUE AND p.listing_status = 'active'
-     GROUP BY p.id, u.name, u.phone, u.role, ag.bio, ag.profile_image
+     GROUP BY p.id, u.name, u.phone, u.role, ag.bio, ag.profile_image, ag.is_verified, pr.name
      ORDER BY p.created_at DESC
      LIMIT 8`
   );
@@ -246,7 +260,7 @@ export async function searchProperties(q: string): Promise<PropertyDTO[]> {
      WHERE p.listing_status = 'active'
        AND to_tsvector('english', p.title || ' ' || p.location || ' ' || p.city)
            @@ plainto_tsquery('english', $1)
-     GROUP BY p.id, u.name, u.phone, u.role, ag.bio, ag.profile_image
+     GROUP BY p.id, u.name, u.phone, u.role, ag.bio, ag.profile_image, ag.is_verified, pr.name
      ORDER BY p.created_at DESC
      LIMIT 20`,
     [q]
@@ -284,6 +298,8 @@ export interface CreatePropertyInput {
   badge_variant?: string;
   is_verified?: boolean;
   is_featured?: boolean;
+  is_owner_direct?: boolean;
+  project_id?: number;
   agent_id?: number;
   imageUrls?: string[];                          // handled separately — not a DB column
   amenities?: { icon: string; label: string }[]; // handled separately — not a DB column
@@ -365,22 +381,29 @@ export async function findPropertyOwnerId(propertyId: number): Promise<number | 
   return rows[0]?.user_id ?? null;
 }
 
-export async function findFavouriteProperties(userId: number): Promise<PropertyDTO[]> {
-  const { rows } = await pool.query<PropertyRow>(
-    `${BASE_SELECT}
+export async function findFavouriteProperties(userId: number): Promise<(PropertyDTO & { priceAtSave?: number })[]> {
+  const { rows } = await pool.query<PropertyRow & { price_at_save?: number }>(
+    `${BASE_SELECT}, fav.price_at_save
      JOIN favourites fav ON fav.property_id = p.id AND fav.user_id = $1
      WHERE p.listing_status = 'active'
-     GROUP BY p.id, u.name, u.phone, u.role, ag.bio, ag.profile_image
+     GROUP BY p.id, u.name, u.phone, u.role, ag.bio, ag.profile_image, ag.is_verified, pr.name, fav.price_at_save
      ORDER BY MAX(fav.created_at) DESC`,
     [userId],
   );
-  return rows.map(toDTO);
+  return rows.map((row) => ({ ...toDTO(row), priceAtSave: row.price_at_save ?? undefined }));
 }
 
 export async function addFavourite(userId: number, propertyId: number): Promise<void> {
+  // Fetch current price to record price_at_save for drop alerts
+  const { rows } = await pool.query<{ price: number }>(
+    `SELECT price FROM properties WHERE id = $1`, [propertyId]
+  );
+  const price = rows[0]?.price ?? null;
   await pool.query(
-    `INSERT INTO favourites (user_id, property_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-    [userId, propertyId],
+    `INSERT INTO favourites (user_id, property_id, price_at_save)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (user_id, property_id) DO NOTHING`,
+    [userId, propertyId, price],
   );
 }
 
@@ -395,7 +418,7 @@ export async function findPropertiesByAgentUserId(userId: number): Promise<Prope
   const { rows } = await pool.query<PropertyRow>(
     `${BASE_SELECT}
      WHERE ag.user_id = $1
-     GROUP BY p.id, u.name, u.phone, u.role, ag.bio, ag.profile_image
+     GROUP BY p.id, u.name, u.phone, u.role, ag.bio, ag.profile_image, ag.is_verified, pr.name
      ORDER BY p.created_at DESC`,
     [userId],
   );
@@ -406,7 +429,7 @@ export async function findPropertiesByAgentId(agentId: number): Promise<Property
   const { rows } = await pool.query<PropertyRow>(
     `${BASE_SELECT}
      WHERE p.agent_id = $1 AND p.listing_status = 'active'
-     GROUP BY p.id, u.name, u.phone, u.role, ag.bio, ag.profile_image
+     GROUP BY p.id, u.name, u.phone, u.role, ag.bio, ag.profile_image, ag.is_verified, pr.name
      ORDER BY p.created_at DESC`,
     [agentId],
   );

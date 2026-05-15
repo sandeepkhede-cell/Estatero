@@ -10,13 +10,16 @@ export interface ContactPayload {
 }
 
 export interface MyAgentProfile {
-  id:            number;
-  agencyName:    string | null;
-  bio:           string | null;
-  licenseNumber: string | null;
-  profileImage:  string | null;
-  rating:        number;
-  listingsCount: number;
+  id:               number;
+  agencyName:       string | null;
+  bio:              string | null;
+  licenseNumber:    string | null;
+  profileImage:     string | null;
+  rating:           number;
+  listingsCount:    number;
+  isVerified:       boolean;
+  responseRate?:    number;
+  avgResponseHours?: number;
 }
 
 export interface UpdateAgentProfileInput {
@@ -54,4 +57,7 @@ export const agentService = {
 
   getMyRating: (agentId: number) =>
     api.get<{ rating: number | null }>(`/agents/${agentId}/my-rating`),
+
+  getStats: () =>
+    api.get<{ totalViews: number; totalListings: number; totalEnquiries: number; responseRate: number | null; avgResponseHours: number | null }>('/analytics/stats'),
 };

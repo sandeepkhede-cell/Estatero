@@ -69,7 +69,9 @@ function buildQuery(filters: Partial<FilterState>): string {
   // Furnishing — multi-value array
   filters.furnishing?.forEach((f) => params.append('furnishing', f));
 
-  if (filters.postedBy) params.set('postedBy', filters.postedBy);
+  if (filters.postedBy)    params.set('postedBy', filters.postedBy);
+  if (filters.ownerDirect) params.set('ownerDirect', 'true');
+  if (filters.reraOnly)    params.set('reraOnly', 'true');
 
   return params.toString();
 }

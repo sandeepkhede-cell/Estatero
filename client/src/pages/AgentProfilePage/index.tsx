@@ -97,13 +97,21 @@ const AgentProfilePage = () => {
                   : initials}
               </div>
               <div className="flex-1 min-w-0 pb-1">
-                <h1 className="text-xl font-bold text-on-surface">{agent.name}</h1>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-xl font-bold text-on-surface">{agent.name}</h1>
+                  {agent.isVerified && (
+                    <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      <span className="material-symbols-outlined text-[12px]">verified</span>
+                      Verified Agent
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm text-on-surface-variant capitalize">{agent.role}</p>
               </div>
             </div>
 
             {/* Stats row */}
-            <div className="grid grid-cols-3 gap-4 bg-surface-container-low rounded-xl p-4 mb-6 text-center">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-surface-container-low rounded-xl p-4 mb-6 text-center">
               <div>
                 <p className="text-lg font-bold text-on-surface">{listings.length}</p>
                 <p className="text-xs text-on-surface-variant">Listings</p>
@@ -115,8 +123,18 @@ const AgentProfilePage = () => {
                 <p className="text-xs text-on-surface-variant">Starting from</p>
               </div>
               <div>
-                <p className="text-lg font-bold text-on-surface capitalize">{agent.role}</p>
-                <p className="text-xs text-on-surface-variant">Type</p>
+                <p className="text-lg font-bold text-on-surface">
+                  {agent.responseRate != null ? `${agent.responseRate}%` : '—'}
+                </p>
+                <p className="text-xs text-on-surface-variant">Response Rate</p>
+              </div>
+              <div>
+                <p className="text-lg font-bold text-on-surface">
+                  {agent.avgResponseHours != null
+                    ? (agent.avgResponseHours < 1 ? `${Math.round(agent.avgResponseHours * 60)}m` : `${Math.round(agent.avgResponseHours)}h`)
+                    : '—'}
+                </p>
+                <p className="text-xs text-on-surface-variant">Avg Reply</p>
               </div>
             </div>
 
@@ -152,6 +170,14 @@ const AgentProfilePage = () => {
                 }
               </div>
             </div>
+
+            {/* Bio */}
+            {agent.bio && (
+              <div className="mb-6">
+                <h2 className="text-sm font-semibold text-on-surface-variant uppercase tracking-wider mb-2">About</h2>
+                <p className="text-sm text-on-surface leading-relaxed">{agent.bio}</p>
+              </div>
+            )}
 
             {/* Contact buttons */}
             <div className="flex gap-3 flex-wrap">

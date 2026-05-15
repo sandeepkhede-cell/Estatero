@@ -9,6 +9,8 @@ import PostedByFilter from './PostedByFilter';
 import AgeFilter from './AgeFilter';
 import FilterSection from './FilterSection';
 import AmenitiesFilter from './AmenitiesFilter';
+import OwnerDirectFilter from './OwnerDirectFilter';
+import ReraFilter from './ReraFilter';
 
 interface SidebarFiltersProps {
   filters: FilterState;
@@ -29,6 +31,8 @@ const SidebarFilters = ({ filters, onFilterChange, onFiltersChange, onClearAll }
     filters.availability,
     filters.ageOfProperty,
     filters.postedBy,
+    filters.ownerDirect,
+    filters.reraOnly,
     (filters.amenities?.length ?? 0) > 0,
   ].filter(Boolean).length;
 
@@ -99,6 +103,20 @@ const SidebarFilters = ({ filters, onFilterChange, onFiltersChange, onClearAll }
             <PostedByFilter
               selected={filters.postedBy}
               onChange={(v) => onFilterChange('postedBy', v)}
+            />
+          </FilterSection>
+
+          <FilterSection label="Owner Direct" defaultOpen={false}>
+            <OwnerDirectFilter
+              selected={filters.ownerDirect}
+              onChange={(v) => onFilterChange('ownerDirect', v)}
+            />
+          </FilterSection>
+
+          <FilterSection label="RERA" defaultOpen={false}>
+            <ReraFilter
+              selected={filters.reraOnly}
+              onChange={(v) => onFilterChange('reraOnly', v)}
             />
           </FilterSection>
 

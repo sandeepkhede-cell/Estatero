@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SidebarFilters from '../../components/listings/SidebarFilters';
 import FilterBar from '../../components/listings/FilterBar';
@@ -7,6 +8,8 @@ import Pagination from '../../components/listings/Pagination';
 import { useProperties } from '../../hooks/useProperties';
 import { useFilters } from '../../hooks/useFilters';
 import { useFavourites } from '../../hooks/useFavourites';
+import { useAuth } from '../../context/AuthContext';
+import { savedSearchService } from '../../services/savedSearchService';
 import { Property } from '../../types/property';
 
 const SORT_LABELS: Record<string, string> = {
@@ -20,9 +23,25 @@ const SORT_CYCLE = ['newest', 'price_asc', 'price_desc'] as const;
 const ListingsPage = () => {
   const navigate  = useNavigate();
   const { toggle } = useFavourites();
+  const { user }   = useAuth();
 
   const { filters, updateFilter, updateFilters, clearAll } = useFilters();
   const { properties, loading, error, total, totalPages } = useProperties(filters);
+
+  const [savingSearch, setSavingSearch] = useState(false);
+  const [searchSaved,  setSearchSaved]  = useState(false);
+
+  const handleSaveSearch = async () => {
+    if (!user) { navigate('/auth'); return; }
+    setSavingSearch(true);
+    try {
+      const name = [filters.city, filters.status, (filters.propertyTypes ?? []).join(', ')].filter(Boolean).join(' · ') || 'My Search';
+      await savedSearchService.save(name, filters);
+      setSearchSaved(true);
+      setTimeout(() => setSearchSaved(false), 3000);
+    } catch { /* silent */ }
+    finally { setSavingSearch(false); }
+  };
 
   const handleCardClick = (id: Property['id']) => navigate(`/property/${id}`);
 
@@ -55,6 +74,25 @@ const ListingsPage = () => {
             sortLabel={SORT_LABELS[filters.sortBy ?? 'newest']}
             onSortClick={handleSortClick}
           />
+          {user?.role === 'buyer' && (
+            <div className="px-6 pb-2 flex justify-end">
+              <button
+                onClick={handleSaveSearch}
+                disabled={savingSearch}
+                className={[
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all',
+                  searchSaved
+                    ? 'bg-primary/10 border-primary text-primary'
+                    : 'border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary',
+                ].join(' ')}
+              >
+                <span className="material-symbols-outlined text-[14px]">
+                  {searchSaved ? 'bookmark_added' : 'bookmark_add'}
+                </span>
+                {searchSaved ? 'Saved!' : 'Save Search'}
+              </button>
+            </div>
+          )}
 
           {loading ? (
             <div className="flex justify-center items-center py-20">

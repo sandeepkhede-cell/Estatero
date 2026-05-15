@@ -6,6 +6,8 @@ import { userService, UserProfile } from '../../services/userService';
 import { inquiryService, Inquiry, SentInquiry, InquiryMessage } from '../../services/inquiryService';
 import { propertyService } from '../../services/propertyService';
 import { agentService, MyAgentProfile } from '../../services/agentService';
+import { savedSearchService, SavedSearch } from '../../services/savedSearchService';
+import { projectService, Project } from '../../services/projectService';
 import { Property } from '../../types/property';
 import PropertyCard from '../../components/ui/PropertyCard';
 import { useFavourites } from '../../hooks/useFavourites';
@@ -28,7 +30,7 @@ async function uploadSingleFile(file: File): Promise<string> {
   return data.urls[0];
 }
 
-type Tab = 'listings' | 'saved' | 'enquiries';
+type Tab = 'listings' | 'saved' | 'enquiries' | 'stats' | 'searches' | 'history' | 'projects';
 
 const CAN_POST_ROLES = ['agent', 'owner', 'builder'] as const;
 type PostingRole = typeof CAN_POST_ROLES[number];
@@ -87,6 +89,25 @@ const ProfilePage = () => {
   const { properties: savedProperties, loading: loadingS, toggle: savedToggle } = useSavedProperties();
 
   const [tab,        setTab]        = useState<Tab>(() => canPost(user?.role) ? 'listings' : 'saved');
+  const [agentStats, setAgentStats] = useState<{ totalViews: number; totalListings: number; totalEnquiries: number; responseRate: number | null; avgResponseHours: number | null } | null>(null);
+  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
+  const [savedSearchLoading, setSavedSearchLoading] = useState(false);
+  const [projects,   setProjects]   = useState<Project[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectDesc, setNewProjectDesc] = useState('');
+  const [newProjectCity, setNewProjectCity] = useState('');
+  const [addingProject, setAddingProject] = useState(false);
+  const [showAddProject, setShowAddProject] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [editProjectName, setEditProjectName] = useState('');
+  const [editProjectDesc, setEditProjectDesc] = useState('');
+  const [editProjectCity, setEditProjectCity] = useState('');
+  const [editProjectStatus, setEditProjectStatus] = useState('');
+  const [savingProject, setSavingProject] = useState(false);
+  const [viewedHistory, setViewedHistory] = useState<{ id: number; title: string; location: string; price: number; viewedAt: string }[]>(() => {
+    try { return JSON.parse(localStorage.getItem('estatero_viewed') ?? '[]'); } catch { return []; }
+  });
   const [profile,    setProfile]    = useState<UserProfile | null>(null);
   const [listings,   setListings]   = useState<Property[]>([]);
   const [inquiries,     setInquiries]     = useState<Inquiry[]>([]);
@@ -112,6 +133,10 @@ const ProfilePage = () => {
   // Listing delete
   const [confirmDeleteId, setConfirmDeleteId] = useState<Property['id'] | null>(null);
   const [deletingId,      setDeletingId]      = useState<Property['id'] | null>(null);
+
+  // Builder: link property to project
+  const [linkingProjectId, setLinkingProjectId] = useState<Property['id'] | null>(null);
+  const [linkingSaving,    setLinkingSaving]    = useState(false);
 
   // Inquiry thread
   const [threadMap,     setThreadMap]     = useState<Record<number, InquiryMessage[]>>({});
@@ -164,6 +189,28 @@ const ProfilePage = () => {
         }
       })
       .catch(() => {});
+
+    if (canPost(user.role)) {
+      agentService.getStats()
+        .then(setAgentStats)
+        .catch(() => {});
+    }
+
+    if (!canPost(user.role)) {
+      setSavedSearchLoading(true);
+      savedSearchService.getAll()
+        .then(setSavedSearches)
+        .catch(() => {})
+        .finally(() => setSavedSearchLoading(false));
+    }
+
+    if (user.role === 'builder') {
+      setProjectsLoading(true);
+      projectService.getMine()
+        .then(setProjects)
+        .catch(() => {})
+        .finally(() => setProjectsLoading(false));
+    }
 
     const poll = canPost(user.role)
       ? setInterval(() => {
@@ -271,6 +318,71 @@ const ProfilePage = () => {
       setMsgErr((err as Error).message);
     } finally {
       setMsgSending(false);
+    }
+  };
+
+  const handleAddProject = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!newProjectName.trim()) return;
+    setAddingProject(true);
+    try {
+      const p = await projectService.create({ name: newProjectName.trim(), description: newProjectDesc || undefined, city: newProjectCity || undefined });
+      setProjects((prev) => [p, ...prev]);
+      setNewProjectName(''); setNewProjectDesc(''); setNewProjectCity('');
+      setShowAddProject(false);
+    } catch { /* silent */ }
+    finally { setAddingProject(false); }
+  };
+
+  const handleDeleteProject = async (id: number) => {
+    try {
+      await projectService.delete(id);
+      setProjects((prev) => prev.filter((p) => p.id !== id));
+    } catch { /* silent */ }
+  };
+
+  const openEditProject = (p: Project) => {
+    setEditingProject(p);
+    setEditProjectName(p.name);
+    setEditProjectDesc(p.description ?? '');
+    setEditProjectCity(p.city ?? '');
+    setEditProjectStatus(p.status ?? 'ongoing');
+  };
+
+  const handleEditProjectSave = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!editingProject || !editProjectName.trim()) return;
+    setSavingProject(true);
+    try {
+      const updated = await projectService.update(editingProject.id, {
+        name:        editProjectName.trim(),
+        description: editProjectDesc || undefined,
+        city:        editProjectCity || undefined,
+        status:      editProjectStatus || undefined,
+      });
+      setProjects((prev) => prev.map((p) => p.id === editingProject.id ? { ...p, ...updated } : p));
+      setEditingProject(null);
+    } catch { /* silent */ }
+    finally { setSavingProject(false); }
+  };
+
+  const handleDeleteSavedSearch = async (id: number) => {
+    try {
+      await savedSearchService.delete(id);
+      setSavedSearches((prev) => prev.filter((s) => s.id !== id));
+    } catch { /* silent */ }
+  };
+
+  const handleLinkProject = async (propertyId: Property['id'], projectId: number | null) => {
+    setLinkingSaving(true);
+    try {
+      const updated = await propertyService.update(propertyId, { project_id: projectId ?? undefined });
+      setListings((prev) => prev.map((p) => p.id === propertyId ? updated : p));
+      setLinkingProjectId(null);
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setLinkingSaving(false);
     }
   };
 
@@ -531,19 +643,27 @@ const ProfilePage = () => {
 
               {/* Details */}
               <div className="flex-1 min-w-0 space-y-1.5">
-                {agentProfile.agencyName && (
-                  <p className="text-sm font-bold text-on-surface">{agentProfile.agencyName}</p>
-                )}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {agentProfile.agencyName && (
+                    <p className="text-sm font-bold text-on-surface">{agentProfile.agencyName}</p>
+                  )}
+                  {agentProfile.isVerified && (
+                    <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      <span className="material-symbols-outlined text-[12px]">verified</span>
+                      Verified
+                    </span>
+                  )}
+                </div>
                 {agentProfile.licenseNumber && (
                   <p className="text-xs text-on-surface-variant flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[14px]">verified</span>
+                    <span className="material-symbols-outlined text-[14px]">badge</span>
                     {agentProfile.licenseNumber}
                   </p>
                 )}
                 {agentProfile.bio && (
                   <p className="text-sm text-on-surface-variant leading-relaxed mt-2">{agentProfile.bio}</p>
                 )}
-                <div className="flex items-center gap-4 mt-3">
+                <div className="flex items-center gap-4 mt-3 flex-wrap">
                   <div className="flex items-center gap-1">
                     <span className="material-symbols-outlined text-[16px] text-amber-500">star</span>
                     <span className="text-sm font-bold text-on-surface">{agentProfile.rating.toFixed(1)}</span>
@@ -552,6 +672,18 @@ const ProfilePage = () => {
                     <span className="material-symbols-outlined text-[16px]">home</span>
                     {agentProfile.listingsCount} active {agentProfile.listingsCount === 1 ? 'listing' : 'listings'}
                   </div>
+                  {agentProfile.responseRate != null && (
+                    <div className="flex items-center gap-1 text-sm text-on-surface-variant">
+                      <span className="material-symbols-outlined text-[16px]">reply</span>
+                      {agentProfile.responseRate}% response rate
+                    </div>
+                  )}
+                  {agentProfile.avgResponseHours != null && (
+                    <div className="flex items-center gap-1 text-sm text-on-surface-variant">
+                      <span className="material-symbols-outlined text-[16px]">schedule</span>
+                      Avg {agentProfile.avgResponseHours < 1 ? `${Math.round(agentProfile.avgResponseHours * 60)}min` : `${Math.round(agentProfile.avgResponseHours)}h`} reply
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -579,21 +711,28 @@ const ProfilePage = () => {
         })()}
 
         {/* Tabs */}
-        <div className="flex border-b border-outline-variant mb-6">
-          {(canPost(user.role) ? ['listings', 'saved', 'enquiries'] : ['saved', 'enquiries'] as Tab[]).map((t) => (
+        <div className="flex border-b border-outline-variant mb-6 overflow-x-auto">
+          {(canPost(user.role)
+            ? (['listings', 'saved', 'enquiries', 'stats', ...(user.role === 'builder' ? ['projects'] : [])] as Tab[])
+            : (['saved', 'enquiries', 'searches', 'history'] as Tab[])
+          ).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={[
-                'relative px-6 py-3 text-sm font-semibold capitalize transition-colors',
+                'relative px-5 py-3 text-sm font-semibold whitespace-nowrap transition-colors flex-shrink-0',
                 tab === t
                   ? 'text-primary border-b-2 border-primary -mb-px'
                   : 'text-on-surface-variant hover:text-on-surface',
               ].join(' ')}
             >
-              {t === 'listings'   && `My Listings (${listings.length})`}
-              {t === 'saved'      && `Saved (${savedProperties.length})`}
-              {t === 'enquiries'  && (
+              {t === 'listings'  && `My Listings (${listings.length})`}
+              {t === 'saved'     && `Saved (${savedProperties.length})`}
+              {t === 'searches'  && `Saved Searches (${savedSearches.length})`}
+              {t === 'history'   && 'Viewed History'}
+              {t === 'stats'     && 'Analytics'}
+              {t === 'projects'  && `Projects (${projects.length})`}
+              {t === 'enquiries' && (
                 <>
                   {canPost(user.role)
                     ? `Enquiries (${inquiries.length})`
@@ -616,6 +755,259 @@ const ProfilePage = () => {
             </button>
           ))}
         </div>
+
+        {/* ── Stats tab ── */}
+        {tab === 'stats' && (
+          agentStats ? (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+              {[
+                { icon: 'visibility',    label: 'Total Views',    value: agentStats.totalViews.toLocaleString('en-IN') },
+                { icon: 'home',          label: 'Total Listings', value: agentStats.totalListings.toString() },
+                { icon: 'forum',         label: 'Enquiries',      value: agentStats.totalEnquiries.toString() },
+                { icon: 'trending_up',   label: 'Response Rate',  value: agentStats.responseRate != null ? `${agentStats.responseRate}%` : 'N/A' },
+              ].map(({ icon, label, value }) => (
+                <div key={label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2">
+                  <span className="material-symbols-outlined text-primary text-2xl">{icon}</span>
+                  <p className="text-2xl font-extrabold text-on-surface">{value}</p>
+                  <p className="text-xs text-on-surface-variant">{label}</p>
+                </div>
+              ))}
+              {agentStats.avgResponseHours != null && (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 col-span-2 sm:col-span-4">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-xl">schedule</span>
+                    <p className="text-sm font-semibold text-on-surface-variant">Avg Response Time</p>
+                  </div>
+                  <p className="text-xl font-extrabold text-on-surface">
+                    {agentStats.avgResponseHours < 1
+                      ? `${Math.round(agentStats.avgResponseHours * 60)} min`
+                      : `${Math.round(agentStats.avgResponseHours)} hrs`}
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex justify-center py-20">
+              <span className="material-symbols-outlined animate-spin text-primary text-5xl">progress_activity</span>
+            </div>
+          )
+        )}
+
+        {/* ── Projects tab (builder only) ── */}
+        {tab === 'projects' && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold text-on-surface">Your Projects</h3>
+              <button
+                onClick={() => setShowAddProject((v) => !v)}
+                className="flex items-center gap-1.5 bg-primary text-white px-4 py-2 rounded-xl text-sm font-semibold"
+              >
+                <span className="material-symbols-outlined text-[16px]">add</span>
+                New Project
+              </button>
+            </div>
+
+            {showAddProject && (
+              <form onSubmit={handleAddProject} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4 space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1">Project Name *</label>
+                  <input value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} placeholder="e.g. Lodha Bellagio" required className={inputCls} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1">City</label>
+                  <input value={newProjectCity} onChange={(e) => setNewProjectCity(e.target.value)} placeholder="e.g. Mumbai" className={inputCls} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1">Description</label>
+                  <textarea rows={2} value={newProjectDesc} onChange={(e) => setNewProjectDesc(e.target.value)} className={inputCls + ' resize-none'} />
+                </div>
+                <div className="flex gap-3">
+                  <button type="submit" disabled={addingProject} className="bg-primary text-white px-6 py-2 rounded-xl text-sm font-semibold disabled:opacity-50">
+                    {addingProject ? 'Creating…' : 'Create Project'}
+                  </button>
+                  <button type="button" onClick={() => setShowAddProject(false)} className="text-sm font-semibold text-on-surface-variant px-3">Cancel</button>
+                </div>
+              </form>
+            )}
+
+            {projectsLoading ? (
+              <div className="flex justify-center py-12"><span className="material-symbols-outlined animate-spin text-primary text-5xl">progress_activity</span></div>
+            ) : projects.length === 0 ? (
+              <div className="flex flex-col items-center py-20 gap-4 text-center">
+                <span className="material-symbols-outlined text-outline text-7xl">apartment</span>
+                <h3 className="text-lg font-bold text-on-surface">No projects yet</h3>
+                <p className="text-body-md text-on-surface-variant">Create a project to group related listings together.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {projects.map((p) => (
+                  <div key={p.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-2">
+                    {editingProject?.id === p.id ? (
+                      <form onSubmit={handleEditProjectSave} className="space-y-3">
+                        <input
+                          value={editProjectName}
+                          onChange={(e) => setEditProjectName(e.target.value)}
+                          className={inputCls}
+                          placeholder="Project name"
+                          required
+                        />
+                        <input
+                          value={editProjectCity}
+                          onChange={(e) => setEditProjectCity(e.target.value)}
+                          className={inputCls}
+                          placeholder="City"
+                        />
+                        <textarea
+                          rows={2}
+                          value={editProjectDesc}
+                          onChange={(e) => setEditProjectDesc(e.target.value)}
+                          className={inputCls + ' resize-none'}
+                          placeholder="Description"
+                        />
+                        <select
+                          value={editProjectStatus}
+                          onChange={(e) => setEditProjectStatus(e.target.value)}
+                          className={selectCls}
+                        >
+                          <option value="ongoing">Ongoing</option>
+                          <option value="upcoming">Upcoming</option>
+                          <option value="completed">Completed</option>
+                        </select>
+                        <div className="flex gap-2">
+                          <button type="submit" disabled={savingProject} className="flex-1 bg-primary text-white py-1.5 rounded-lg text-sm font-semibold disabled:opacity-50">
+                            {savingProject ? 'Saving…' : 'Save'}
+                          </button>
+                          <button type="button" onClick={() => setEditingProject(null)} className="flex-1 border border-outline-variant py-1.5 rounded-lg text-sm font-semibold text-on-surface-variant">
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <>
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="font-bold text-on-surface text-sm leading-tight">{p.name}</h4>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
+                            p.status === 'completed' ? 'bg-green-100 text-green-700'
+                            : p.status === 'upcoming' ? 'bg-blue-100 text-blue-700'
+                            : 'bg-amber-100 text-amber-700'
+                          }`}>{p.status.charAt(0).toUpperCase() + p.status.slice(1)}</span>
+                        </div>
+                        {p.city && <p className="text-xs text-on-surface-variant flex items-center gap-1"><span className="material-symbols-outlined text-[13px]">location_on</span>{p.city}</p>}
+                        {p.description && <p className="text-xs text-on-surface-variant leading-relaxed line-clamp-2">{p.description}</p>}
+                        <p className="text-xs text-on-surface-variant">{p.property_count ?? 0} {p.property_count === 1 ? 'unit' : 'units'} linked</p>
+                        <div className="flex gap-3 mt-1">
+                          <button
+                            onClick={() => openEditProject(p)}
+                            className="text-xs text-primary hover:underline font-semibold"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteProject(p.id)}
+                            className="text-xs text-red-500 hover:underline font-semibold"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Saved Searches tab (buyer) ── */}
+        {tab === 'searches' && (
+          savedSearchLoading ? (
+            <div className="flex justify-center py-20"><span className="material-symbols-outlined animate-spin text-primary text-5xl">progress_activity</span></div>
+          ) : savedSearches.length === 0 ? (
+            <div className="flex flex-col items-center py-20 gap-4 text-center">
+              <span className="material-symbols-outlined text-outline text-7xl">search</span>
+              <h3 className="text-lg font-bold text-on-surface">No saved searches</h3>
+              <p className="text-body-md text-on-surface-variant">Save a search on the listings page to get quick access to it later.</p>
+              <button onClick={() => navigate('/listings')} className="mt-2 bg-primary text-white px-8 py-3 rounded-xl font-semibold">Browse Listings</button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {savedSearches.map((s) => (
+                <div key={s.id} className="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-4 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-semibold text-on-surface text-sm">{s.name}</p>
+                    <p className="text-xs text-on-surface-variant mt-0.5">
+                      {[s.filters.city, s.filters.status, (s.filters.propertyTypes ?? []).join(', ')].filter(Boolean).join(' · ') || 'All properties'}
+                    </p>
+                    <p className="text-[10px] text-on-surface-variant mt-0.5">{timeAgo(s.created_at)}</p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => {
+                        const params = new URLSearchParams();
+                        if (s.filters.city) params.set('city', s.filters.city);
+                        if (s.filters.status) params.set('type', s.filters.status);
+                        navigate(`/listings?${params.toString()}`);
+                      }}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">search</span>
+                      Apply
+                    </button>
+                    <button
+                      onClick={() => handleDeleteSavedSearch(s.id)}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-red-500 hover:underline"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">delete</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+
+        {/* ── Viewed History tab (buyer) ── */}
+        {tab === 'history' && (
+          viewedHistory.length === 0 ? (
+            <div className="flex flex-col items-center py-20 gap-4 text-center">
+              <span className="material-symbols-outlined text-outline text-7xl">history</span>
+              <h3 className="text-lg font-bold text-on-surface">No properties viewed yet</h3>
+              <p className="text-body-md text-on-surface-variant">Properties you view will appear here for quick access.</p>
+              <button onClick={() => navigate('/listings')} className="mt-2 bg-primary text-white px-8 py-3 rounded-xl font-semibold">Browse Properties</button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex justify-between items-center mb-2">
+                <p className="text-sm text-on-surface-variant">{viewedHistory.length} properties viewed</p>
+                <button
+                  onClick={() => { setViewedHistory([]); localStorage.removeItem('estatero_viewed'); }}
+                  className="text-xs font-semibold text-red-500 hover:underline"
+                >
+                  Clear History
+                </button>
+              </div>
+              {viewedHistory.map((item) => (
+                <button
+                  key={`${item.id}-${item.viewedAt}`}
+                  onClick={() => navigate(`/property/${item.id}`)}
+                  className="w-full bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-4 flex items-center justify-between gap-4 text-left hover:border-primary/50 transition-colors"
+                >
+                  <div>
+                    <p className="font-semibold text-on-surface text-sm">{item.title}</p>
+                    <p className="text-xs text-on-surface-variant mt-0.5 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[12px]">location_on</span>
+                      {item.location}
+                    </p>
+                  </div>
+                  <div className="flex-shrink-0 text-right">
+                    <p className="text-sm font-bold text-primary">₹{item.price.toLocaleString('en-IN')}</p>
+                    <p className="text-[10px] text-on-surface-variant">{timeAgo(item.viewedAt)}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )
+        )}
 
         {/* Tab content */}
         {tab === 'listings' ? (
@@ -671,6 +1063,46 @@ const ProfilePage = () => {
                     </button>
                   </div>
 
+                  {/* Builder: Link to Project */}
+                  {user.role === 'builder' && (
+                    <div className="mt-2 px-1">
+                      {linkingProjectId === p.id ? (
+                        <div className="flex items-center gap-2">
+                          <select
+                            autoFocus
+                            defaultValue={p.projectId ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              handleLinkProject(p.id, val === '' ? null : Number(val));
+                            }}
+                            disabled={linkingSaving}
+                            className="flex-1 border border-primary rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+                          >
+                            <option value="">— No project (standalone) —</option>
+                            {projects.map((proj) => (
+                              <option key={proj.id} value={proj.id}>{proj.name}</option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => setLinkingProjectId(null)}
+                            disabled={linkingSaving}
+                            className="text-xs font-semibold text-on-surface-variant hover:text-on-surface px-2"
+                          >
+                            {linkingSaving ? '…' : 'Cancel'}
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setLinkingProjectId(p.id)}
+                          className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-dashed border-outline-variant text-xs font-semibold text-on-surface-variant hover:border-primary hover:text-primary transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">domain</span>
+                          {p.projectName ? `Project: ${p.projectName}` : 'Link to Project'}
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   {/* Inline delete confirmation */}
                   {confirmDeleteId === p.id && (
                     <div className="mt-2 p-3 rounded-lg bg-red-50 border border-red-100">
@@ -712,9 +1144,26 @@ const ProfilePage = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {savedProperties.map((p) => (
-                <PropertyCard key={p.id} property={p} onCardClick={(id) => navigate(`/property/${id}`)} onFavourite={savedToggle} />
-              ))}
+              {savedProperties.map((p) => {
+                const drop = p.priceAtSave && p.priceAtSave > p.price
+                  ? p.priceAtSave - p.price
+                  : null;
+                return (
+                  <div key={p.id} className="relative">
+                    {drop !== null && (
+                      <div className="absolute top-3 left-3 z-10 flex items-center gap-1 bg-green-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg">
+                        <span className="material-symbols-outlined text-[12px]">trending_down</span>
+                        Price dropped ₹{drop.toLocaleString('en-IN')}
+                      </div>
+                    )}
+                    <PropertyCard
+                      property={p}
+                      onCardClick={(id) => navigate(`/property/${id}`)}
+                      onFavourite={savedToggle}
+                    />
+                  </div>
+                );
+              })}
             </div>
           )
         ) : (

@@ -25,6 +25,7 @@ export interface PostPropertyForm {
   emi:             string;
   rera_registered: boolean;
   rera_number:     string;
+  is_owner_direct: boolean;
 
   // Step 5 — Amenities
   amenities: string[];
@@ -35,6 +36,10 @@ export interface PostPropertyForm {
   // Step 7 — Review
   title:       string;
   description: string;
+
+  // Builder — Project link (optional)
+  projectId?:   number;
+  projectName?: string;
 }
 
 export const EMPTY_FORM: PostPropertyForm = {
@@ -57,10 +62,13 @@ export const EMPTY_FORM: PostPropertyForm = {
   emi:          '',
   rera_registered: false,
   rera_number:  '',
+  is_owner_direct: false,
   amenities:    [],
   imageUrls:    [],
   title:        '',
   description:  '',
+  projectId:    undefined,
+  projectName:  undefined,
 };
 
 export const STEPS = [

@@ -36,6 +36,8 @@ export interface FilterState {
 
   // Posted by
   postedBy?:      'owner' | 'agent' | 'builder';
+  ownerDirect?:   boolean;
+  reraOnly?:      boolean;
 
   // Sorting & pagination
   sortBy?:        SortOption;
